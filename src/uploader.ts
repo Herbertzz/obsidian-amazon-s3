@@ -146,7 +146,7 @@ export class Uploader {
         const fileType = await fileTypeFromBuffer(fileData);
 
         // 生成唯一的 S3 Key (文件路径)
-        const s3Key = await TemplateParser.uploadPath(
+        const uploadPath = await TemplateParser.uploadPath(
             this.settings.uploadPathTemplate,
             file,
             fileType?.ext ?? '',
@@ -169,8 +169,8 @@ export class Uploader {
 
         // 构建并发送上传命令
         const command = new PutObjectCommand({
-            Bucket: this.settings.bucketName,
-            Key: s3Key,
+            Bucket: this.settings.bucket,
+            Key: uploadPath,
             Body: new Uint8Array(fileData),
             ContentType: fileType?.mime ?? 'application/octet-stream',
             // ACL: 'public-read', // 如果你的 Bucket 策略要求显式声明公共读权限，可以取消注释
@@ -178,14 +178,12 @@ export class Uploader {
         await client.send(command);
 
         // 构建返回的 URL
-        const encodedKey = s3Key.split('/').map(part => encodeURIComponent(part)).join('/');
-        if (this.settings.endpoint) {
-            // 简单处理：拼接 endpoint + bucketName + key
-            const baseUrl = this.settings.endpoint.endsWith('/') ? this.settings.endpoint : `${this.settings.endpoint}/`;
-            return `${baseUrl}${this.settings.bucketName}/${encodedKey}`;
-        } else {
-            return `https://${this.settings.bucketName}.s3.${this.settings.region}.amazonaws.com/${encodedKey}`;
-        }
+        const uploadedPath = uploadPath.split('/').map(part => encodeURIComponent(part)).join('/');
+        return TemplateParser.outputURL(this.settings.outputURLTemplate, {
+            endpoint: this.settings.endpoint,
+            bucket: this.settings.bucket,
+            region: this.settings.region,
+        }, uploadedPath);
     }
 
     /**

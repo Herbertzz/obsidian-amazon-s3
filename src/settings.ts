@@ -9,10 +9,10 @@ export interface AmazonS3UploaderPluginSettings {
 	// 自定义终端节点
 	endpoint: string;
 	// S3 桶名称
-	bucketName: string;
+	bucket: string;
 	// 区域
 	region: string;
-	// 上传路径模板支持以下占位符
+	// 上传路径模板, 支持以下占位符
 	// {year}	年
 	// {month}	月
 	// {day}	日
@@ -29,6 +29,11 @@ export interface AmazonS3UploaderPluginSettings {
 	// {sha1}	图片 SHA1
 	// {sha256}	图片 SHA256
 	uploadPathTemplate: string;
+	// 自定义输出 URL 模板，支持以下占位符
+	// {endpoint} 节点
+	// {bucket} 桶名
+	// {path} 上传文件路径
+	outputURLTemplate: string;
 	// 强制路径样式
 	forcePathStyle: boolean;
 
@@ -44,9 +49,10 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	accessKeyId: '',
 	secretAccessKey: '',
 	endpoint: '',
-	bucketName: 'obsidian',
+	bucket: 'obsidian',
 	region: 'us-east-1',
 	uploadPathTemplate: '{year}/{month}/{fullName}',
+	outputURLTemplate: '{endpoint}/{bucket}/{path}',
 	forcePathStyle: false,
 	workOnNetWork: false,
 	newWorkBlackDomains: '',
@@ -67,7 +73,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('S3 自动上传与清理 - 设置')
+			.setName('S3 设置')
 			.setHeading();
 
 		new Setting(containerEl)
@@ -117,9 +123,9 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			.setName('桶名')
 			.addText(text => text
 				.setPlaceholder('Bucket name')
-				.setValue(this.plugin.settings.bucketName)
+				.setValue(this.plugin.settings.bucket)
 				.onChange(async (value) => {
-					this.plugin.settings.bucketName = value.trim();
+					this.plugin.settings.bucket = value.trim();
 					await this.plugin.saveSettings();
 				}));
 
@@ -131,6 +137,17 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.uploadPathTemplate)
 				.onChange(async (value) => {
 					this.plugin.settings.uploadPathTemplate = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('输出 URL 模板')
+			.setDesc('输出 URL 模板, 支持这些占位符: {endpoint}, {bucket}, {path}')
+			.addText(text => text
+				.setPlaceholder('默认为 {endpoint}/{bucket}/{path}')
+				.setValue(this.plugin.settings.outputURLTemplate)
+				.onChange(async (value) => {
+					this.plugin.settings.outputURLTemplate = value.trim();
 					await this.plugin.saveSettings();
 				}));
 

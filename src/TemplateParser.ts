@@ -65,6 +65,29 @@ export class TemplateParser {
 	}
 
 	/**
+	 * 解析输出 URL 模板
+	 * @param template 用户在设置中填写的模板字符串
+	 * @param setting 包含 endpoint、bucket 和 region 的设置对象
+	 * @param path 上传文件的路径
+	 * @returns 生成的输出 URL
+	 */
+	static outputURL(template: string, setting: { endpoint: string; bucket: string; region: string; }, path: string): string {
+		let endpoint = setting.endpoint;
+		if (endpoint === '') {
+			endpoint = `https://${setting.bucket}.s3.${setting.region}.amazonaws.com`;
+		}
+		if (endpoint.endsWith('/')) {
+			endpoint = endpoint.slice(0, -1);
+		}
+
+		let result = template;
+		result = result.replace(/{endpoint}/g, setting.endpoint);
+		result = result.replace(/{bucket}/g, setting.bucket);
+		result = result.replace(/{path}/g, path);
+		return result;
+	}
+
+	/**
 	 * 计算 SHA-1 或 SHA-256 (Web Crypto API)
 	 */
 	private static async calculateHash(algorithm: 'SHA-1' | 'SHA-256', data: ArrayBuffer): Promise<string> {
