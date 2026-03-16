@@ -1,97 +1,56 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "settings";
+import { MarkdownView, Plugin } from 'obsidian';
+import { DEFAULT_SETTINGS, AmazonS3UploaderPluginSettings, AmazonS3UploaderSettingTab } from "settings";
+import Helper from 'helper';
+import { Uploader } from 'uploader';
+
 
 export default class AmazonS3UploaderPlugin extends Plugin {
-	settings: MyPluginSettings;
+	settings: AmazonS3UploaderPluginSettings;
+	uploader: Uploader;
 
 	async onload() {
+		// 加载本地持久化的配置数据
 		await this.loadSettings();
+		// 将配置面板注册到 Obsidian 的设置弹窗中
+		this.addSettingTab(new AmazonS3UploaderSettingTab(this.app, this));
+		// 实例化上传器
+		this.uploader = new Uploader(this.app, this.settings);
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
+			id: 'upload-all-images',
+			name: '上传所有图片',
 			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (view) {
 					if (!checking) {
-						new SampleModal(this.app).open();
+						this.uploader.uploadAll();
 					}
-
-					// This command will only show up in Command Palette when the check function returns true
 					return true;
 				}
+
 				return false;
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		// // This adds an editor command that can perform some operation on the current editor instance
+		// this.addCommand({
+		// 	id: 'replace-selected',
+		// 	name: 'Replace selected content',
+		// 	editorCallback: (editor: Editor, view: MarkdownView) => {
+		// 		editor.replaceSelection('Sample editor command');
+		// 	}
+		// });
 	}
 
 	onunload() {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<AmazonS3UploaderPluginSettings>);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
 }
