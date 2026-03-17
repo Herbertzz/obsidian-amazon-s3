@@ -148,7 +148,7 @@ export default class Helper {
     }
 
     // 生成 Markdown 链接, 根据文件扩展名判断是图片链接还是普通文件链接
-    async makeLink(path: string, description: string = '', realExtension?: string): Promise<string> {
+    makeLink(path: string, description: string = '', realExtension?: string): string {
         if (realExtension) {
             if (this.isImage(realExtension)) {
                 return this.makeImageLink(path, description);

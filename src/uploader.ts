@@ -141,17 +141,6 @@ export class Uploader {
         this.replaceImage(fileList, uploadUrlList);
     }
 
-
-    private async uploadByClipboard(files: FileList): Promise<string | null> {
-        const file = files.item(0);
-        if (!file) {
-            return null;
-        }
-
-        const fileData = await file.arrayBuffer();
-        return this.updateByBuffer(file.name, fileData)
-    }
-
     private async upload(tfile: TFile): Promise<string> {
         const fileData = await this.app.vault.readBinary(tfile);
         return this.updateByBuffer(tfile.name, fileData);
@@ -235,7 +224,7 @@ export class Uploader {
     }
 
     // 监听剪贴板事件，自动上传图片
-    onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
+    async onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
         const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByClipboardSwitch);
         if (!allowUpload) {
             return;
@@ -245,39 +234,78 @@ export class Uploader {
             return;
         }
 
+        if (!this.canUpload(evt.clipboardData)) {
+            return;
+        }
+
+        // 拦截默认行为
+        evt.preventDefault();
+
+
+        // 获取剪贴板中的文件列表
+        const uploadList: File[] = [];
+        for (let i = 0; i < evt.clipboardData.files.length; i++) {
+            const file = evt.clipboardData.files.item(i);
+            if (file) {
+                uploadList.push(file);
+            }
+        }
+
         // 剪贴板内容有md格式的图片时
         if (this.settings.workOnNetWork) {
             const clipboardValue = evt.clipboardData.getData("text/plain");
             const linkList = this.helper.getLink(clipboardValue)
                 .filter(link => link.type === 'network')
 
-            // 下载网络图片到本地后再上传，避免跨域问题
+            // 下载网络图片到本地
             if (linkList.length !== 0) {
-                //   this.upload(imageList).then(res => {
-                //     let uploadUrlList = res.result;
-                //     this.replaceImage(imageList, uploadUrlList);
-                //   });
+                for (const link of linkList) {
+                    const res = await this.downloader.download(link.path);
+                    if (!res.success || !res.filePath) {
+                        console.error(`Failed to download ${link.path}:`, res.error);
+                        new Notice(`下载 ${link.name} 失败！`);
+                        continue;
+                    }
+
+                    const tfile = this.app.vault.getAbstractFileByPath(res.filePath);
+                    if (!(tfile instanceof TFile)) {
+                        console.error(`Downloaded file not found in vault: ${res.filePath}`);
+                        new Notice(`下载 ${link.name} 成功，但未找到文件！`);
+                        continue;
+                    }
+
+                    const arrayBuffer = await this.app.vault.readBinary(tfile);
+                    const file = new File([arrayBuffer], tfile.name, {
+                        type: res.mimeType,
+                        lastModified: tfile.stat.mtime,
+                    });
+
+                    uploadList.push(file);
+                }
             }
         }
 
-        // 剪贴板中是图片时进行上传
-        if (this.canUpload(evt.clipboardData)) {
-            this.uploadFileAndEmbedImgurImage(
-                editor,
-                async (editor: Editor, pasteId: string) => {
-                    if (!evt.clipboardData) {
-                        return null;
-                    }
+        if (uploadList.length === 0) {
+            return;
+        }
 
-                    const url = await this.uploadByClipboard(evt.clipboardData.files);
-                    if (!url) {
-                        this.handleFailedUpload(editor, pasteId, "文件不存在")
-                    }
-                    return url
-                },
-                evt.clipboardData
-            ).catch();
-            evt.preventDefault();
+        // 开始上传
+        for (const file of uploadList) {
+            let pasteId = this.makeID();
+            this.insertTemporaryText(editor, pasteId);
+
+            try {
+                const url = await this.uploadByFile(file);
+                if (url) {
+                    const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
+                    this.embedMarkdownLink(editor, pasteId, fileType?.ext ?? '', url, file.name);
+                } else {
+                    this.handleFailedUpload(editor, pasteId, "文件不存在")
+                }
+            } catch (e) {
+                const reason = e instanceof Error ? e.message : String(e);
+                this.handleFailedUpload(editor, pasteId, reason);
+            }
         }
     }
 
@@ -293,26 +321,26 @@ export class Uploader {
 
         const files = evt.dataTransfer?.files;
         if (!files || files.length === 0) return;
-        const filteredFiles = this.filterFiles(files);
-        if (filteredFiles.length === 0) return;
 
-        // 拦截默认行为！防止 Obsidian 把图片复制到本地附件文件夹
+        // 拦截默认行为
         evt.preventDefault();
 
-        for (const file of filteredFiles) {
+        for (let i = 0; i < files.length; i++) {
+            const file = files.item(i);
+            if (!file) {
+                continue;
+            }
+
             const url = await this.uploadByFile(file);
 
-            const pasteId = (Math.random() + 1).toString(36).substr(2, 5);
-            this.insertTemporaryText(editor, pasteId);
-            this.embedMarkDownImage(editor, pasteId, url, file.name);
+            const id = this.makeID();
+            this.insertTemporaryText(editor, id);
+            const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
+            this.embedMarkdownLink(editor, id, fileType?.ext ?? '', url, file.name);
         }
     }
 
-    private filterFiles(files: FileList): File[] {
-        return Array.from(files)
-            .filter(file => file.type.startsWith("image/"));
-    }
-
+    // 判断剪贴板数据是否包含可上传的图片
     private canUpload(clipboardData: DataTransfer) {
         const files = clipboardData.files;
         const text = clipboardData.getData("text");
@@ -330,46 +358,38 @@ export class Uploader {
         }
     }
 
-    private async uploadFileAndEmbedImgurImage(editor: Editor, callback: Function, clipboardData: DataTransfer) {
-        let pasteId = (Math.random() + 1).toString(36).substr(2, 5);
-        this.insertTemporaryText(editor, pasteId);
-        const name = clipboardData.files.item(0)?.name ?? "";
-
-        try {
-            const url = await callback(editor, pasteId);
-            this.embedMarkDownImage(editor, pasteId, url, name);
-        } catch (e) {
-            const reason = e instanceof Error ? e.message : String(e);
-            this.handleFailedUpload(editor, pasteId, reason);
-        }
+    // 生成一个随机 ID，用于临时占位符
+    private makeID() {
+        return (Math.random() + 1).toString(36).substring(2, 7);
     }
 
-    private insertTemporaryText(editor: Editor, pasteId: string) {
-        const progressText = this.progressTextFor(pasteId);
+    // 在编辑器中插入临时文本占位符
+    private insertTemporaryText(editor: Editor, id: string) {
+        const progressText = this.progressTextFor(id);
         editor.replaceSelection(progressText + "\n");
     }
 
-    private embedMarkDownImage(editor: Editor, pasteId: string, imageUrl: string, name: string = "") {
-        let progressText = this.progressTextFor(pasteId);
-        let markDownImage = `![${name}](${imageUrl})`;
-        this.replaceFirstOccurrence(editor, progressText, markDownImage);
+    // 将 Markdown 链接嵌入编辑器，替换之前的占位符文本
+    private embedMarkdownLink(editor: Editor, id: string, ext: string, path: string, name: string = "") {
+        const progressText = this.progressTextFor(id);
+        const link = this.helper.makeLink(path, name, ext);
+        this.replaceFirstOccurrence(editor, progressText, link);
     }
 
-    handleFailedUpload(editor: Editor, pasteId: string, reason: string) {
+    // 处理上传失败的情况，替换占位符文本为错误提示
+    handleFailedUpload(editor: Editor, id: string, reason: string) {
         new Notice(reason);
         console.error("Failed request: ", reason);
-        let progressText = this.progressTextFor(pasteId);
-        this.replaceFirstOccurrence(
-            editor,
-            progressText,
-            "⚠️upload failed, check dev console"
-        );
+        const progressText = this.progressTextFor(id);
+        this.replaceFirstOccurrence(editor, progressText, "⚠️upload failed, check dev console");
     }
 
+    // 生成临时占位符文本
     private progressTextFor(id: string) {
         return `![Uploading file...${id}]()`;
     }
 
+    // 替换编辑器中第一次出现的目标文本为替换文本
     private replaceFirstOccurrence(editor: Editor, target: string, replacement: string) {
         let lines = editor.getValue().split("\n");
         for (let i = 0; i < lines.length; i++) {
