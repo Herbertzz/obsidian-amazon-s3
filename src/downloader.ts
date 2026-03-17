@@ -58,16 +58,15 @@ export class Downloader {
         // 下载文件并保存
         new Notice(`共找到 ${networkFiles.length} 个网络图片，正在下载...`);
         const downloadedFiles: FileData[] = [];
-        let successCount = 0;
         for (const file of networkFiles) {
             const response = await this.downloadByReferer(file.path, referer);
             if (!response.success) {
                 console.error(`下载 ${file.path} 失败: ${response.error}`);
-                new Notice(`下载失败: [${successCount + 1}/${networkFiles.length}] ${response.error}`);
+                new Notice(`下载失败: ${file.path} ${response.error}`);
                 continue;
             }
             if (!response.data) {
-                new Notice(`下载失败: [${successCount + 1}/${networkFiles.length}] 没有数据`);
+                new Notice(`下载失败: ${file.path} 没有数据`);
                 continue;
             }
 
@@ -89,9 +88,6 @@ export class Downloader {
                 realExtension: fileType?.ext,
                 mimeType: fileType?.mime,
             });
-
-            new Notice(`下载成功: [${successCount + 1}/${networkFiles.length}]`);
-            successCount++;
         }
         // console.log("下载完成的文件：", downloadedFiles);
 
