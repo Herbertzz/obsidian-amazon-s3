@@ -1,9 +1,8 @@
 import { fileTypeFromBuffer } from "file-type";
 import Helper from "helper";
-import { App, Modal, normalizePath, Notice, Platform, requestUrl, TFile } from "obsidian";
-import { join, parse, relative } from "path-browserify";
+import { App, Modal, normalizePath, Notice, Platform } from "obsidian";
+import { join, relative } from "path-browserify";
 import { FileData } from "types";
-import { getUrlAsset } from "utils";
 
 interface DownloadResponse {
     success: boolean;
@@ -20,69 +19,82 @@ export class Downloader {
         this.helper = new Helper(app);
     }
 
-    // 下载所有网络图片并替换链接
+    // 下载所有网络图片
     async downloadAll() {
         const activeFile = this.app.workspace.getActiveFile();
 
         // 确保下载目录存在
-        const saveDir = await this.app.fileManager.getAvailablePathForAttachment("");
+        // @ts-ignore 由于 getConfig 是未文档化的内部 API，官方的 .d.ts 类型定义里没有它，所以这里使用 @ts-ignore 来绕过类型检查
+        const saveDir = this.app.vault.getConfig("attachmentFolderPath");
         if (!(await this.app.vault.adapter.exists(saveDir))) {
             await this.app.vault.adapter.mkdir(saveDir);
         }
 
         // 筛选出网络文件
-        const fileArray: FileData[] = []
+        const networkFiles: FileData[] = []
         const files = this.helper.getAllFiles();
+        // console.log("所有文件：", files);
         for (const file of files) {
             if (!file.path.startsWith("http")) {
                 continue;
             }
 
-            const url = file.path;
-            const asset = getUrlAsset(url);
-            let name = decodeURI(parse(asset).name).replace(/[\\\\/:*?\"<>|]/g, "-");
-
-            fileArray.push({
+            networkFiles.push({
                 path: file.path,
-                name: name,
+                name: file.name,
                 source: file.source,
-                type: 'network',
             });
         }
+        // console.log("网络文件：", networkFiles);
 
-        if (fileArray.length === 0) {
-            new Notice("没有需要下载的网络图片");
+        if (networkFiles.length === 0) {
+            new Notice("没有需要下载的网络文件");
             return;
         }
 
+        // 获取 Referer
+        const referer = await this.getReferer();
+
         // 下载文件并保存
-        new Notice(`共找到 ${fileArray.length} 个网络图片，正在下载...`);
+        new Notice(`共找到 ${networkFiles.length} 个网络图片，正在下载...`);
         const downloadedFiles: FileData[] = [];
-        for (const file of fileArray) {
-            const response = await this.downloadByReferer(file.path);
+        let successCount = 0;
+        for (const file of networkFiles) {
+            const response = await this.downloadByReferer(file.path, referer);
             if (!response.success) {
-                new Notice(`下载 ${file.path} 失败: ${response.error}`);
+                console.error(`下载 ${file.path} 失败: ${response.error}`);
+                new Notice(`下载失败: [${successCount + 1}/${networkFiles.length}] ${response.error}`);
                 continue;
             }
             if (!response.data) {
-                new Notice(`下载 ${file.path} 失败: 没有数据`);
+                new Notice(`下载失败: [${successCount + 1}/${networkFiles.length}] 没有数据`);
                 continue;
             }
 
+            // 从 URL 中提取文件名，处理 URL 编码，并替换掉不合法的文件名字符
+            const urlObj = new URL(file.path);
+            const pathname = decodeURI(urlObj.pathname);
+            const name = pathname.substring(pathname.lastIndexOf("/") + 1)
+                .replace(/[\\\\/:*?\"<>|]/g, "-");
+
             const fileType = await fileTypeFromBuffer(response.data);
-            const ext = fileType?.ext ? `.${fileType.ext}` : "";
-            const savePath = normalizePath(join(saveDir, `${file.name}${ext}`));
+            const savePath = normalizePath(join(saveDir, name));
             await this.app.vault.adapter.writeBinary(savePath, response.data);
-            new Notice(`下载 ${file.path} 成功，保存为 ${savePath}`);
 
             downloadedFiles.push({
                 path: savePath,
                 name: file.name,
                 source: file.source,
                 type: 'local',
-                data: response.data,
+                realExtension: fileType?.ext,
+                mimeType: fileType?.mime,
             });
+
+            new Notice(`下载成功: [${successCount + 1}/${networkFiles.length}]`);
+            successCount++;
         }
+        // console.log("下载完成的文件：", downloadedFiles);
+
 
         // 更新文件链接
         const activeFolder = this.app.workspace.getActiveFile()?.parent?.path;
@@ -90,7 +102,7 @@ export class Downloader {
         for (const file of downloadedFiles) {
             if (file.type === 'local' && activeFolder) {
                 const relativePath = relative(normalizePath(activeFolder), normalizePath(file.path));
-                const link = await this.helper.makeFileLink(file.data!, relativePath, file.name);
+                const link = await this.helper.makeLink(relativePath, file.name, file.realExtension);
                 value = value.replace(file.source, link);
             }
         }
@@ -104,7 +116,7 @@ export class Downloader {
         new Notice("下载完成");
     }
 
-    private async downloadByReferer(url: string): Promise<DownloadResponse> {
+    private async downloadByReferer(url: string, referer: string): Promise<DownloadResponse> {
         if (!Platform.isDesktopApp) {
             return { success: false, error: "移动端不支持通过 Referer 下载" };
         }
@@ -113,7 +125,7 @@ export class Downloader {
             headers: {
                 Accept: "*/*",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-                Referer: await this.getReferer(),
+                Referer: referer,
             },
             // rejectUnauthorized: false, // 调试自签名证书时解除注释
         };
