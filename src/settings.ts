@@ -49,6 +49,10 @@ export interface AmazonS3UploaderPluginSettings {
 	applyImage: boolean;
 	// 是否启用拖拽自动上传
 	uploadByDropSwitch: boolean;
+	// 文件下载代理
+	downloadProxy: string;
+	// referer 规则
+	refererRules: string;
 }
 
 export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
@@ -66,6 +70,8 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	uploadByClipboardSwitch: false,
 	applyImage: true,
 	uploadByDropSwitch: false,
+	downloadProxy: '',
+	refererRules: '',
 }
 
 export class AmazonS3UploaderSettingTab extends PluginSettingTab {
@@ -249,6 +255,29 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 					.onChange(async value => {
 						this.plugin.settings.uploadByDropSwitch = value;
 						this.display();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("文件下载代理")
+			.setDesc("设置文件下载的代理地址，为空表示不使用代理。使用 {url} 占位符代表下载链接，例如：http://localhost:7890/proxy?url={url}")
+			.addText(text => text
+				.setPlaceholder("请输入代理地址")
+				.setValue(this.plugin.settings.downloadProxy)
+				.onChange(async (value) => {
+					this.plugin.settings.downloadProxy = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Referer 规则")
+			.setDesc("设置 Referer 规则，用于防盗链下载。一行一个规则, 格式为 {domain},{referer}，例如：example.com,https://example.com\nexample.org,https://example.org")
+			.addTextArea(textArea =>
+				textArea
+					.setValue(this.plugin.settings.refererRules)
+					.onChange(async value => {
+						this.plugin.settings.refererRules = value;
 						await this.plugin.saveSettings();
 					})
 			);
