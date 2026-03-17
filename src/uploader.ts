@@ -1,6 +1,6 @@
 import { App, Editor, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
 import { fileTypeFromBuffer } from 'file-type';
-import { Image } from "types";
+import { FileInfoWithTFile } from "types";
 import { TemplateParser } from "TemplateParser";
 import { PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import Helper from "helper";
@@ -29,36 +29,32 @@ export class Uploader {
         const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
         const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
 
-        let imageList: (Image & { file: TFile | null })[] = [];
-        const fileArray = this.helper.getAllFiles();
-        for (const match of fileArray) {
-            const imageName = match.name;
-            const uri = decodeURI(match.path);
-
-            if (match.type === "network") {
-                imageList.push({
-                    path: match.path,
-                    name: imageName,
-                    source: match.source,
+        const fileList: FileInfoWithTFile[] = [];
+        const links = this.helper.getAllFiles();
+        for (const link of links) {
+            if (link.type === "network") {
+                fileList.push({
+                    path: link.path,
+                    name: link.name,
+                    source: link.source,
                     type: 'network',
-                    file: null,
+                    tfile: null,
                 });
                 continue;
             }
 
-            const fileName = basename(uri);
+            const path = decodeURI(link.path);
+            const fileName = basename(path);
             let file: TFile | undefined | null;
+
             // 优先匹配绝对路径
-            if (filePathMap[uri]) {
-                file = filePathMap[uri];
+            if (filePathMap[path]) {
+                file = filePathMap[path];
             }
 
             // 相对路径
-            if ((!file && uri.startsWith("./")) || uri.startsWith("../")) {
-                const filePath = normalizePath(
-                    resolve(dirname(activeFile?.path || ""), uri)
-                );
-
+            if ((!file && path.startsWith("./")) || path.startsWith("../")) {
+                const filePath = normalizePath(resolve(dirname(activeFile?.path || ""), path));
                 file = filePathMap[filePath];
             }
 
@@ -69,28 +65,28 @@ export class Uploader {
 
             if (file) {
                 if (isAssetTypeAnImage(file.path)) {
-                    imageList.push({
+                    fileList.push({
                         path: normalizePath(file.path),
-                        name: imageName,
-                        source: match.source,
+                        name: link.name,
+                        source: link.source,
                         type: 'local',
-                        file: file,
+                        tfile: file,
                     });
                 }
             }
         }
 
-        if (imageList.length === 0) {
+        if (fileList.length === 0) {
             new Notice("没有找到任何图片！");
             return;
         } else {
-            new Notice(`已找到 ${imageList.length} 张图片！`);
+            new Notice(`已找到 ${fileList.length} 张图片！`);
         }
 
         // 下载网络文件到本地
         if (this.settings.workOnNetWork) {
             new Notice("正在下载网络文件...");
-            for (const item of imageList) {
+            for (const item of fileList) {
                 if (item.type !== "network") {
                     continue;
                 }
@@ -105,9 +101,9 @@ export class Uploader {
                 item.path = downloadResult.filePath ?? '';
                 item.type = 'local';
 
-                const file = this.app.vault.getAbstractFileByPath(item.path);
-                if (file instanceof TFile) {
-                    item.file = file;
+                const tfile = this.app.vault.getAbstractFileByPath(item.path);
+                if (tfile instanceof TFile) {
+                    item.tfile = tfile;
                 } else {
                     console.error(`Downloaded file not found in vault: ${item.path}`);
                     new Notice(`下载 ${item.name} 成功，但未找到文件！`);
@@ -117,21 +113,21 @@ export class Uploader {
 
         // 上传图片并获取 URL
         const uploadUrlList: string[] = [];
-        for (const image of imageList) {
-            if (!image.file) {
+        for (const file of fileList) {
+            if (!file.tfile) {
                 continue;
             }
 
             try {
-                const url = await this.upload(image.file);
+                const url = await this.upload(file.tfile);
                 uploadUrlList.push(url);
             } catch (error) {
-                console.error(`Failed to upload ${image.path}:`, error);
-                new Notice(`上传 ${image.name} 失败！`);
+                console.error(`Failed to upload ${file.path}:`, error);
+                new Notice(`上传 ${file.name} 失败！`);
             }
         }
 
-        if (imageList.length !== uploadUrlList.length) {
+        if (fileList.length !== uploadUrlList.length) {
             new Notice("警告：图片列表与上传成功的文件数量不一致");
             return;
         }
@@ -142,7 +138,7 @@ export class Uploader {
             return;
         }
 
-        this.replaceImage(imageList, uploadUrlList);
+        this.replaceImage(fileList, uploadUrlList);
     }
 
 
@@ -156,9 +152,9 @@ export class Uploader {
         return this.updateByBuffer(file.name, fileData)
     }
 
-    private async upload(file: TFile): Promise<string> {
-        const fileData = await this.app.vault.readBinary(file);
-        return this.updateByBuffer(file.name, fileData);
+    private async upload(tfile: TFile): Promise<string> {
+        const fileData = await this.app.vault.readBinary(tfile);
+        return this.updateByBuffer(tfile.name, fileData);
     }
 
     private async uploadByFile(file: File): Promise<string> {
@@ -213,7 +209,7 @@ export class Uploader {
     /**
      * 替换上传的图片
      */
-    private replaceImage(imageList: Image[], uploadUrlList: string[]) {
+    private replaceImage(fileList: FileInfoWithTFile[], uploadUrlList: string[]) {
         const editorContent = this.helper.getValue();
         if (!editorContent) {
             new Notice("无法获取编辑器内容！");
@@ -221,7 +217,7 @@ export class Uploader {
         }
 
         let content: string = editorContent;
-        imageList.map(item => {
+        fileList.map(item => {
             const uploadImage = uploadUrlList.shift();
             content = content.split(item.source).join(`![${item.name}](${uploadImage})`);
         });
@@ -230,9 +226,9 @@ export class Uploader {
 
         // 删除本地原文件
         if (this.settings.deleteSource) {
-            imageList.map(image => {
-                if (image.file && image.type === 'local') {
-                    this.app.fileManager.trashFile(image.file);
+            fileList.map(file => {
+                if (file.tfile && file.type === 'local') {
+                    this.app.fileManager.trashFile(file.tfile);
                 }
             });
         }

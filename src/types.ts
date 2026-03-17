@@ -1,11 +1,14 @@
 import type { TFile } from "obsidian";
 
-export interface Image {
+export interface FileInfo {
   path: string;
   name: string;
   source: string;
   type?: 'network' | 'local';
-  file?: TFile | null;
+}
+
+export interface FileInfoWithTFile extends FileInfo {
+  tfile: TFile | null;
 }
 
 export interface FileData {
