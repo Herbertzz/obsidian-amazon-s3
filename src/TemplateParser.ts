@@ -1,4 +1,3 @@
-import { TFile } from "obsidian";
 import SparkMD5 from 'spark-md5';
 
 export class TemplateParser {

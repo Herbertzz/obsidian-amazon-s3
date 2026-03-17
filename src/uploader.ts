@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
 import { fileTypeFromBuffer } from 'file-type';
 import { FileInfoWithTFile } from "types";
-import { TemplateParser } from "TemplateParser";
+import { TemplateParser } from "templateParser";
 import { PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import Helper from "helper";
 import { AmazonS3UploaderPluginSettings } from "settings";
