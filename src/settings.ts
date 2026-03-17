@@ -43,6 +43,10 @@ export interface AmazonS3UploaderPluginSettings {
 	newWorkBlackDomains: string;
 	// 是否删除原文件	
 	deleteSource: boolean;
+	// 是否启用剪贴板自动上传
+	uploadByClipboardSwitch: boolean;
+	// 当剪切板中同时拥有文本和图片时, 是否上传图片
+	applyImage: boolean;
 }
 
 export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
@@ -57,6 +61,8 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	workOnNetWork: false,
 	newWorkBlackDomains: '',
 	deleteSource: false,
+	uploadByClipboardSwitch: false,
+	applyImage: true,
 }
 
 export class AmazonS3UploaderSettingTab extends PluginSettingTab {
@@ -112,7 +118,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('地区')
 			.addText(text => text
-				.setPlaceholder('Region')
+				.setPlaceholder('没有指定自定义节点时必填，默认为 us-east-1')
 				.setValue(this.plugin.settings.region)
 				.onChange(async (value) => {
 					this.plugin.settings.region = value.trim();
@@ -152,10 +158,6 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('高级设置')
-			.setHeading();
-
-		new Setting(containerEl)
 			.setName('强制路径样式')
 			.setDesc('很多第三方兼容 S3 的服务需要强制路径样式')
 			.addToggle(toggle =>
@@ -166,6 +168,10 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 						this.display();
 						await this.plugin.saveSettings();
 					}));
+
+		new Setting(containerEl)
+			.setName('高级设置')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName("应用网络图片")
@@ -200,6 +206,31 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.deleteSource)
 					.onChange(async value => {
 						this.plugin.settings.deleteSource = value;
+						this.display();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("剪切板自动上传")
+			.setDesc("启用该选项后，粘贴图片时会自动上传")
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.uploadByClipboardSwitch)
+					.onChange(async value => {
+						this.plugin.settings.uploadByClipboardSwitch = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("当剪切板中同时拥有文本和图片时, 是否上传图片")
+			.setDesc("当你复制时，某些应用例如 Excel 会在剪切板同时文本和图像数据，确认是否上传。")
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.applyImage)
+					.onChange(async value => {
+						this.plugin.settings.applyImage = value;
 						this.display();
 						await this.plugin.saveSettings();
 					})

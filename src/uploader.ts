@@ -1,4 +1,4 @@
-import { App, normalizePath, Notice, TFile } from "obsidian";
+import { App, Editor, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
 import { fileTypeFromBuffer } from 'file-type';
 import { Image } from "types";
 import { TemplateParser } from "TemplateParser";
@@ -115,6 +115,7 @@ export class Uploader {
         this.replaceImage(imageList, uploadUrlList);
     }
 
+
     private filterFile(fileArray: Image[]) {
         const imageList: Image[] = [];
 
@@ -141,16 +142,30 @@ export class Uploader {
         return imageList;
     }
 
+    private async uploadByClipboard(files: FileList): Promise<string | null> {
+        const file = files.item(0);
+        if (!file) {
+            return null;
+        }
+
+        const fileData = await file.arrayBuffer();
+        return this.updateByBuffer(file.name, fileData)
+    }
+
     private async upload(file: TFile): Promise<string> {
         const fileData = await this.app.vault.readBinary(file);
-        const fileType = await fileTypeFromBuffer(fileData);
+        return this.updateByBuffer(file.name, fileData);
+    }
+
+    private async updateByBuffer(filename: string, buffer: ArrayBuffer): Promise<string> {
+        const fileType = await fileTypeFromBuffer(buffer);
 
         // 生成唯一的 S3 Key (文件路径)
         const uploadPath = await TemplateParser.uploadPath(
             this.settings.uploadPathTemplate,
-            file,
+            filename,
             fileType?.ext ?? '',
-            fileData
+            buffer
         );
 
         // 初始化 S3 客户端
@@ -171,7 +186,7 @@ export class Uploader {
         const command = new PutObjectCommand({
             Bucket: this.settings.bucket,
             Key: uploadPath,
-            Body: new Uint8Array(fileData),
+            Body: new Uint8Array(buffer),
             ContentType: fileType?.mime ?? 'application/octet-stream',
             // ACL: 'public-read', // 如果你的 Bucket 策略要求显式声明公共读权限，可以取消注释
         });
@@ -189,7 +204,7 @@ export class Uploader {
     /**
      * 替换上传的图片
      */
-    replaceImage(imageList: Image[], uploadUrlList: string[]) {
+    private replaceImage(imageList: Image[], uploadUrlList: string[]) {
         const editorContent = this.helper.getValue();
         if (!editorContent) {
             new Notice("无法获取编辑器内容！");
@@ -213,6 +228,130 @@ export class Uploader {
                     this.app.fileManager.trashFile(image.file);
                 }
             });
+        }
+    }
+
+    // 监听剪贴板事件，自动上传图片
+    onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
+        new Notice("触发粘贴事件1");
+        const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByClipboardSwitch);
+        if (!allowUpload) {
+            return;
+        }
+        new Notice("触发粘贴事件2");
+
+        if (!evt.clipboardData) {
+            return;
+        }
+        new Notice("触发粘贴事件3");
+
+        // 剪贴板内容有md格式的图片时
+        if (this.settings.workOnNetWork) {
+            const clipboardValue = evt.clipboardData.getData("text/plain");
+            const imageList = this.helper
+                .getImageLink(clipboardValue)
+                .filter(image => image.path.startsWith("http"))
+                .filter(image => !this.helper.hasBlackDomain(image.path, this.settings.newWorkBlackDomains));
+
+            // 下载网络图片到本地后再上传，避免跨域问题
+            if (imageList.length !== 0) {
+                //   this.upload(imageList).then(res => {
+                //     let uploadUrlList = res.result;
+                //     this.replaceImage(imageList, uploadUrlList);
+                //   });
+            }
+        }
+
+        // 剪贴板中是图片时进行上传
+        if (this.canUpload(evt.clipboardData)) {
+            this.uploadFileAndEmbedImgurImage(
+                editor,
+                async (editor: Editor, pasteId: string) => {
+                    if (!evt.clipboardData) {
+                        return null;
+                    }
+
+                    const url = await this.uploadByClipboard(evt.clipboardData.files);
+                    if (!url) {
+                        this.handleFailedUpload(editor, pasteId, "文件不存在")
+                    }
+                    return url
+                },
+                evt.clipboardData
+            ).catch();
+            evt.preventDefault();
+        }
+    }
+
+
+    private canUpload(clipboardData: DataTransfer) {
+        const files = clipboardData.files;
+        const text = clipboardData.getData("text");
+
+        const firstFile = files.item(0);
+        const hasImageFile = !!firstFile && firstFile.type.startsWith("image");
+        if (hasImageFile) {
+            if (!!text) {
+                return this.settings.applyImage;
+            } else {
+                return true;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    private async uploadFileAndEmbedImgurImage(editor: Editor, callback: Function, clipboardData: DataTransfer) {
+        let pasteId = (Math.random() + 1).toString(36).substr(2, 5);
+        this.insertTemporaryText(editor, pasteId);
+        const name = clipboardData.files.item(0)?.name ?? "";
+
+        try {
+            const url = await callback(editor, pasteId);
+            this.embedMarkDownImage(editor, pasteId, url, name);
+        } catch (e) {
+            const reason = e instanceof Error ? e.message : String(e);
+            this.handleFailedUpload(editor, pasteId, reason);
+        }
+    }
+
+    private insertTemporaryText(editor: Editor, pasteId: string) {
+        const progressText = this.progressTextFor(pasteId);
+        editor.replaceSelection(progressText + "\n");
+    }
+
+    private embedMarkDownImage(editor: Editor, pasteId: string, imageUrl: string, name: string = "") {
+        let progressText = this.progressTextFor(pasteId);
+        let markDownImage = `![${name}](${imageUrl})`;
+        this.replaceFirstOccurrence(editor, progressText, markDownImage);
+    }
+
+    handleFailedUpload(editor: Editor, pasteId: string, reason: string) {
+        new Notice(reason);
+        console.error("Failed request: ", reason);
+        let progressText = this.progressTextFor(pasteId);
+        this.replaceFirstOccurrence(
+            editor,
+            progressText,
+            "⚠️upload failed, check dev console"
+        );
+    }
+
+    private progressTextFor(id: string) {
+        return `![Uploading file...${id}]()`;
+    }
+
+    private replaceFirstOccurrence(editor: Editor, target: string, replacement: string) {
+        let lines = editor.getValue().split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i] ?? "";
+            let ch = line.indexOf(target);
+            if (ch != -1) {
+                let from = { line: i, ch: ch };
+                let to = { line: i, ch: ch + target.length };
+                editor.replaceRange(replacement, from, to);
+                break;
+            }
         }
     }
 }

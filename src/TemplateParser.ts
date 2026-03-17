@@ -5,10 +5,11 @@ export class TemplateParser {
 	/**
 	 * 解析上传路径模板
 	 * @param template 用户在设置中填写的模板字符串
-	 * @param file Obsidian 的 TFile 对象
+	 * @param filename 文件名
+	 * @param extension 文件扩展名
 	 * @param fileData 文件的二进制数据 (用于计算 Hash)
 	 */
-	static async uploadPath(template: string, file: TFile, extension: string, fileData: ArrayBuffer): Promise<string> {
+	static async uploadPath(template: string, filename: string, extension: string, fileData: ArrayBuffer): Promise<string> {
 		const now = new Date();
 
 		// 1. 准备时间数据 (自动补零)
@@ -23,8 +24,8 @@ export class TemplateParser {
 		const timestampMS = now.getTime().toString();
 
 		// 2. 准备文件数据
-		const fullName = file.name;         // 例如: "image.png"
-		const fileName = file.basename;     // 例如: "image"
+		const fullName = filename;         // 例如: "image.png"
+		const fileName = filename.replace(/\.[^/.]+$/, ""); // 例如: "image"
 		const extName = extension;           // 例如: "png"
 
 		let result = template;
