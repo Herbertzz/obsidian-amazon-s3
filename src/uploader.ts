@@ -5,7 +5,6 @@ import { TemplateParser } from "TemplateParser";
 import { PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import Helper from "helper";
 import { AmazonS3UploaderPluginSettings } from "settings";
-import { arrayToObject, isAssetTypeAnImage } from "utils";
 import { basename, dirname, resolve } from "path-browserify";
 import { Downloader } from "downloader";
 
@@ -23,11 +22,11 @@ export class Uploader {
         this.downloader = new Downloader(this.app, this.settings);
     }
 
-    // 上传所有图片
+    // 上传所有文件
     async uploadAll() {
         const activeFile = this.app.workspace.getActiveFile();
-        const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
-        const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
+        const fileMap = this.helper.arrayToObject(this.app.vault.getFiles(), "name");
+        const filePathMap = this.helper.arrayToObject(this.app.vault.getFiles(), "path");
 
         const fileList: FileInfoWithTFile[] = [];
         const links = this.helper.getAllFiles();
@@ -64,15 +63,13 @@ export class Uploader {
             }
 
             if (file) {
-                if (isAssetTypeAnImage(file.path)) {
-                    fileList.push({
-                        path: normalizePath(file.path),
-                        name: link.name,
-                        source: link.source,
-                        type: 'local',
-                        tfile: file,
-                    });
-                }
+                fileList.push({
+                    path: normalizePath(file.path),
+                    name: link.name,
+                    source: link.source,
+                    type: 'local',
+                    tfile: file,
+                });
             }
         }
 

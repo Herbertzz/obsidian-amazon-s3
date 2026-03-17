@@ -1,5 +1,9 @@
 import type { TFile } from "obsidian";
 
+export interface AnyObj {
+  [key: string]: any;
+}
+
 export interface FileInfo {
   path: string;
   name: string;

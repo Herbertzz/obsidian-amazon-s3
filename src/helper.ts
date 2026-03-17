@@ -1,6 +1,7 @@
 import { MarkdownView, App } from "obsidian";
 import { parse } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "settings";
+import { AnyObj } from "types";
 
 interface Link {
     path: string;
@@ -157,7 +158,7 @@ export default class Helper {
             }
         }
 
-        const ext = parse(path).ext.slice(1); 
+        const ext = parse(path).ext.slice(1);
         if (ext && this.isImage(ext)) {
             return this.makeImageLink(path, description);
         }
@@ -189,5 +190,14 @@ export default class Helper {
             "avif",
         ];
         return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+    }
+
+    // 将数组转换为对象，key 为对象的某个属性值，value 为对象本身
+    arrayToObject<T extends AnyObj>(arr: T[], key: string): { [key: string]: T } {
+        const obj: { [key: string]: T } = {};
+        arr.forEach(element => {
+            obj[element[key]] = element;
+        });
+        return obj;
     }
 }
