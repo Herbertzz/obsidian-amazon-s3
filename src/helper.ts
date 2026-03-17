@@ -10,10 +10,31 @@ interface Link {
     type: 'network' | 'local';
 }
 
-// ![](./dsa/aa.png) local image should has ext, support ![](<./dsa/aa.png>), support ![](image.png "alt")
-// ![](https://dasdasda) internet image should not has ext
+// REGEX_FILE 可匹配以下格式（图片用 ![]() 前缀，普通文件用 []() 前缀）：
+//   ![[alt](<./path/image.png>)   带尖括号路径，本地文件（路径中需含扩展名）
+//   ![alt](./path/image.png)      标准 Markdown 图片/文件链接（路径中需含扩展名）
+//   ![alt](image.png "title")     带可选标题的本地链接
+//   ![alt](https://example.com/x) 网络链接（http/https，无需扩展名）
 const REGEX_FILE = /\!?\[(.*?)\]\(<(\S+\.\w+)>\)|\!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|\!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
+// REGEX_WIKI_FILE 可匹配以下格式：
+//   ![[image.png]]          Wiki 风格图片嵌入
+//   ![[image.png|alias]]    带别名的 Wiki 风格图片嵌入
 const REGEX_WIKI_FILE = /\!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
+
+const IMAGE_EXT_LIST = [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "svg",
+    "tiff",
+    "bmp",
+    "ico",
+    "avif",
+    "heic",
+    "heif",
+];
 
 export default class Helper {
     private app: App;
@@ -178,17 +199,7 @@ export default class Helper {
 
     // 判断文件是否为图片
     isImage(ext: string) {
-        const IMAGE_EXT_LIST = [
-            "png",
-            "jpg",
-            "jpeg",
-            "bmp",
-            "gif",
-            "svg",
-            "tiff",
-            "webp",
-            "avif",
-        ];
+
         return IMAGE_EXT_LIST.includes(ext.toLowerCase());
     }
 
