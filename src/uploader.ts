@@ -7,17 +7,20 @@ import Helper from "helper";
 import { AmazonS3UploaderPluginSettings } from "settings";
 import { arrayToObject, isAssetTypeAnImage } from "utils";
 import { basename, dirname, resolve } from "path-browserify";
+import { Downloader } from "downloader";
 
 
 export class Uploader {
     private app: App;
     private settings: AmazonS3UploaderPluginSettings;
     private helper: Helper;
+    private downloader: Downloader;
 
     constructor(app: App, settings: AmazonS3UploaderPluginSettings) {
         this.app = app;
         this.settings = settings;
         this.helper = new Helper(this.app, this.settings);
+        this.downloader = new Downloader(this.app, this.settings);
     }
 
     // 上传所有图片
@@ -84,8 +87,35 @@ export class Uploader {
             new Notice(`已找到 ${imageList.length} 张图片！`);
         }
 
-        // todo 下载网络图片到本地后再上传，避免跨域问题
+        // 下载网络文件到本地
+        if (this.settings.workOnNetWork) {
+            new Notice("正在下载网络文件...");
+            for (const item of imageList) {
+                if (item.type !== "network") {
+                    continue;
+                }
 
+                const downloadResult = await this.downloader.download(item.path);
+                if (!downloadResult.success) {
+                    console.error(`Failed to download ${item.path}:`, downloadResult.error);
+                    new Notice(`下载 ${item.name} 失败！`);
+                    continue;
+                }
+
+                item.path = downloadResult.filePath ?? '';
+                item.type = 'local';
+
+                const file = this.app.vault.getAbstractFileByPath(item.path);
+                if (file instanceof TFile) {
+                    item.file = file;
+                } else {
+                    console.error(`Downloaded file not found in vault: ${item.path}`);
+                    new Notice(`下载 ${item.name} 成功，但未找到文件！`);
+                }
+            }
+        }
+
+        // 上传图片并获取 URL
         const uploadUrlList: string[] = [];
         for (const image of imageList) {
             if (!image.file) {
@@ -197,8 +227,6 @@ export class Uploader {
         });
 
         this.helper.setValue(content);
-
-        // todo 删除下载的网络图片文件
 
         // 删除本地原文件
         if (this.settings.deleteSource) {
