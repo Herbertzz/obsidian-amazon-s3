@@ -17,7 +17,7 @@ export class Uploader {
     constructor(app: App, settings: AmazonS3UploaderPluginSettings) {
         this.app = app;
         this.settings = settings;
-        this.helper = new Helper(this.app);
+        this.helper = new Helper(this.app, this.settings);
     }
 
     // 上传所有图片
@@ -25,14 +25,14 @@ export class Uploader {
         const activeFile = this.app.workspace.getActiveFile();
         const fileMap = arrayToObject(this.app.vault.getFiles(), "name");
         const filePathMap = arrayToObject(this.app.vault.getFiles(), "path");
-        let imageList: (Image & { file: TFile | null })[] = [];
-        const fileArray = this.filterFile(this.helper.getAllFiles());
 
+        let imageList: (Image & { file: TFile | null })[] = [];
+        const fileArray = this.helper.getAllFiles();
         for (const match of fileArray) {
             const imageName = match.name;
             const uri = decodeURI(match.path);
 
-            if (uri.startsWith("http")) {
+            if (match.type === "network") {
                 imageList.push({
                     path: match.path,
                     name: imageName,
@@ -115,32 +115,6 @@ export class Uploader {
         this.replaceImage(imageList, uploadUrlList);
     }
 
-
-    private filterFile(fileArray: Image[]) {
-        const imageList: Image[] = [];
-
-        for (const match of fileArray) {
-            if (match.path.startsWith("http")) {
-                if (this.settings.workOnNetWork) {
-                    if (!this.helper.hasBlackDomain(match.path, this.settings.newWorkBlackDomains)) {
-                        imageList.push({
-                            path: match.path,
-                            name: match.name,
-                            source: match.source,
-                        });
-                    }
-                }
-            } else {
-                imageList.push({
-                    path: match.path,
-                    name: match.name,
-                    source: match.source,
-                });
-            }
-        }
-
-        return imageList;
-    }
 
     private async uploadByClipboard(files: FileList): Promise<string | null> {
         const file = files.item(0);
@@ -250,13 +224,11 @@ export class Uploader {
         // 剪贴板内容有md格式的图片时
         if (this.settings.workOnNetWork) {
             const clipboardValue = evt.clipboardData.getData("text/plain");
-            const imageList = this.helper
-                .getImageLink(clipboardValue)
-                .filter(image => image.path.startsWith("http"))
-                .filter(image => !this.helper.hasBlackDomain(image.path, this.settings.newWorkBlackDomains));
+            const linkList = this.helper.getLink(clipboardValue)
+                .filter(link => link.type === 'network')
 
             // 下载网络图片到本地后再上传，避免跨域问题
-            if (imageList.length !== 0) {
+            if (linkList.length !== 0) {
                 //   this.upload(imageList).then(res => {
                 //     let uploadUrlList = res.result;
                 //     this.replaceImage(imageList, uploadUrlList);

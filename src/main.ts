@@ -17,7 +17,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 		// 实例化上传器
 		this.uploader = new Uploader(this.app, this.settings);
 		// 实例化下载器
-		this.downloader = new Downloader(this.app);
+		this.downloader = new Downloader(this.app, this.settings);
 
 		this.addCommand({
 			id: 'upload-all-images',

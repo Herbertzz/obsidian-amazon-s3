@@ -2,6 +2,7 @@ import { fileTypeFromBuffer } from "file-type";
 import Helper from "helper";
 import { App, Modal, normalizePath, Notice, Platform } from "obsidian";
 import { join, relative } from "path-browserify";
+import { AmazonS3UploaderPluginSettings } from "settings";
 import { FileData } from "types";
 
 interface DownloadResponse {
@@ -13,10 +14,12 @@ interface DownloadResponse {
 export class Downloader {
     private app: App;
     private helper: Helper;
+    private settings: AmazonS3UploaderPluginSettings;
 
-    constructor(app: App) {
+    constructor(app: App, settings: AmazonS3UploaderPluginSettings) {
         this.app = app;
-        this.helper = new Helper(app);
+        this.settings = settings;
+        this.helper = new Helper(app, settings);
     }
 
     // 下载所有网络图片
@@ -35,7 +38,7 @@ export class Downloader {
         const files = this.helper.getAllFiles();
         // console.log("所有文件：", files);
         for (const file of files) {
-            if (!file.path.startsWith("http")) {
+            if (file.type !== "network") {
                 continue;
             }
 

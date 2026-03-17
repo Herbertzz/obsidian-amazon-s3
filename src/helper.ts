@@ -1,25 +1,26 @@
-import imageType from "image-type";
 import { MarkdownView, App } from "obsidian";
 import { parse } from "path-browserify";
-import { FileData } from "types";
+import { AmazonS3UploaderPluginSettings } from "settings";
 
-interface Image {
+interface Link {
     path: string;
     name: string;
     source: string;
+    type: 'network' | 'local';
 }
 
 // ![](./dsa/aa.png) local image should has ext, support ![](<./dsa/aa.png>), support ![](image.png "alt")
 // ![](https://dasdasda) internet image should not has ext
-const REGEX_FILE =
-    /\!\[(.*?)\]\(<(\S+\.\w+)>\)|\!\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|\!\[(.*?)\]\((https?:\/\/.*?)\)/g;
+const REGEX_FILE = /\!?\[(.*?)\]\(<(\S+\.\w+)>\)|\!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|\!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
 const REGEX_WIKI_FILE = /\!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
 
 export default class Helper {
     private app: App;
+    private settings: AmazonS3UploaderPluginSettings;
 
-    constructor(app: App) {
+    constructor(app: App, settings: AmazonS3UploaderPluginSettings) {
         this.app = app;
+        this.settings = settings;
     }
 
     // 获取当前文件的 frontmatter 对象
@@ -71,21 +72,17 @@ export default class Helper {
         editor.setCursor(position);
     }
 
-    // get all file urls, include local and internet
-    getAllFiles(): Image[] {
-        const editor = this.getEditor();
-        if (!editor) {
-            return [];
-        }
-
-        return this.getImageLink(editor.getValue());
+    // 获取当前文件中的所有文件链接 (包含本地文件、网络文件、本地图片、网络图片)
+    getAllFiles(): Link[] {
+        return this.getLink(this.getValue() ?? "");
     }
 
-    getImageLink(value: string): Image[] {
+    // 从指定字符串中获取所有链接, 并根据设置过滤掉不需要处理的链接
+    getLink(value: string): Link[] {
         const matches = value.matchAll(REGEX_FILE);
         const WikiMatches = value.matchAll(REGEX_WIKI_FILE);
 
-        let fileArray: Image[] = [];
+        let fileArray: Link[] = [];
 
         for (const match of matches) {
             const source = match[0];
@@ -97,6 +94,7 @@ export default class Helper {
                 path: path,
                 name: name,
                 source: source,
+                type: path.startsWith("http") ? "network" : "local",
             });
         }
 
@@ -111,12 +109,33 @@ export default class Helper {
                 path: path,
                 name: name,
                 source: source,
+                type: path.startsWith("http") ? "network" : "local",
             });
         }
 
-        return fileArray;
+        return this.filterLinks(fileArray);
     }
 
+    // 过滤链接列表，返回符合设置要求的链接
+    private filterLinks(links: Link[]) {
+        const filteredLinks: Link[] = [];
+
+        for (const match of links) {
+            if (match.type === 'network') {
+                if (this.settings.workOnNetWork) {
+                    if (!this.hasBlackDomain(match.path, this.settings.newWorkBlackDomains)) {
+                        filteredLinks.push(match);
+                    }
+                }
+            } else {
+                filteredLinks.push(match);
+            }
+        }
+
+        return filteredLinks;
+    }
+
+    // 判断链接是否包含黑名单中的域名
     hasBlackDomain(src: string, blackDomains: string) {
         if (blackDomains.trim() === "") {
             return false;
@@ -127,7 +146,6 @@ export default class Helper {
 
         return blackDomainList.some(blackDomain => domain.includes(blackDomain));
     }
-
 
     // 生成 Markdown 链接, 根据文件扩展名判断是图片链接还是普通文件链接
     async makeLink(path: string, description: string = '', realExtension?: string): Promise<string> {
