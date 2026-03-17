@@ -157,6 +157,11 @@ export class Uploader {
         return this.updateByBuffer(file.name, fileData);
     }
 
+    private async uploadByFile(file: File): Promise<string> {
+        const fileData = await file.arrayBuffer();
+        return this.updateByBuffer(file.name, fileData)
+    }
+
     private async updateByBuffer(filename: string, buffer: ArrayBuffer): Promise<string> {
         const fileType = await fileTypeFromBuffer(buffer);
 
@@ -233,17 +238,14 @@ export class Uploader {
 
     // 监听剪贴板事件，自动上传图片
     onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
-        new Notice("触发粘贴事件1");
         const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByClipboardSwitch);
         if (!allowUpload) {
             return;
         }
-        new Notice("触发粘贴事件2");
 
         if (!evt.clipboardData) {
             return;
         }
-        new Notice("触发粘贴事件3");
 
         // 剪贴板内容有md格式的图片时
         if (this.settings.workOnNetWork) {
@@ -283,6 +285,37 @@ export class Uploader {
         }
     }
 
+    // 监听拖拽事件，自动上传图片   
+    async onDropAutoUpload(evt: DragEvent, editor: Editor) {
+        // 如果按住了 Ctrl/Cmd，放行，执行 Obsidian 默认行为（保存到本地）
+        if (evt.ctrlKey || evt.metaKey) return;
+
+        const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByDropSwitch);
+        if (!allowUpload) {
+            return;
+        }
+
+        const files = evt.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+        const filteredFiles = this.filterFiles(files);
+        if (filteredFiles.length === 0) return;
+
+        // 拦截默认行为！防止 Obsidian 把图片复制到本地附件文件夹
+        evt.preventDefault();
+
+        for (const file of filteredFiles) {
+            const url = await this.uploadByFile(file);
+
+            const pasteId = (Math.random() + 1).toString(36).substr(2, 5);
+            this.insertTemporaryText(editor, pasteId);
+            this.embedMarkDownImage(editor, pasteId, url, file.name);
+        }
+    }
+
+    private filterFiles(files: FileList): File[] {
+        return Array.from(files)
+            .filter(file => file.type.startsWith("image/"));
+    }
 
     private canUpload(clipboardData: DataTransfer) {
         const files = clipboardData.files;

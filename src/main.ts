@@ -41,7 +41,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 		// 		editor.replaceSelection('Sample editor command');
 		// 	}
 		// });
-		this.setupPasteHandler();
+		this.setupEventHandler();
 	}
 
 	onunload() {
@@ -55,9 +55,12 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	setupPasteHandler() {
+	setupEventHandler() {
 		this.registerEvent(
 			this.app.workspace.on("editor-paste", this.uploader.onClipboardAutoUpload.bind(this.uploader))
+		);
+		this.registerEvent(
+			this.app.workspace.on("editor-drop", this.uploader.onDropAutoUpload.bind(this.uploader))
 		);
 	}
 }

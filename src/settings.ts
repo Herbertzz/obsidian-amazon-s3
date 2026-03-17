@@ -47,6 +47,8 @@ export interface AmazonS3UploaderPluginSettings {
 	uploadByClipboardSwitch: boolean;
 	// 当剪切板中同时拥有文本和图片时, 是否上传图片
 	applyImage: boolean;
+	// 是否启用拖拽自动上传
+	uploadByDropSwitch: boolean;
 }
 
 export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
@@ -63,6 +65,7 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	deleteSource: false,
 	uploadByClipboardSwitch: false,
 	applyImage: true,
+	uploadByDropSwitch: false,
 }
 
 export class AmazonS3UploaderSettingTab extends PluginSettingTab {
@@ -219,6 +222,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.uploadByClipboardSwitch)
 					.onChange(async value => {
 						this.plugin.settings.uploadByClipboardSwitch = value;
+						this.display();
 						await this.plugin.saveSettings();
 					})
 			);
@@ -231,6 +235,19 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.applyImage)
 					.onChange(async value => {
 						this.plugin.settings.applyImage = value;
+						this.display();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("拖拽自动上传")
+			.setDesc("启用该选项后，拖拽图片时会自动上传。如果按住了 Ctrl/Cmd，放行，执行 Obsidian 默认行为（保存到本地）	")
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.uploadByDropSwitch)
+					.onChange(async value => {
+						this.plugin.settings.uploadByDropSwitch = value;
 						this.display();
 						await this.plugin.saveSettings();
 					})
