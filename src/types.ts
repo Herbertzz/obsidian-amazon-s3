@@ -7,3 +7,11 @@ export interface Image {
   type?: 'network' | 'local';
   file?: TFile | null;
 }
+
+export interface FileData {
+  path: string;
+  name: string;
+  source: string;
+  type?: 'network' | 'local';
+  data?: ArrayBuffer;
+}

@@ -1,5 +1,7 @@
+import imageType from "image-type";
 import { MarkdownView, App } from "obsidian";
 import { parse } from "path-browserify";
+import { FileData } from "types";
 
 interface Image {
   path: string;
@@ -20,17 +22,23 @@ export default class Helper {
     this.app = app;
   }
 
-  getFrontmatterValue(key: string, defaultValue: any = undefined) {
-    const file = this.app.workspace.getActiveFile();
-    if (!file) {
-      return undefined;
+  // 获取当前文件的 frontmatter 对象
+  getFrontmatter(): Record<string, any> {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      return {};
     }
-    const path = file.path;
-    const cache = this.app.metadataCache.getCache(path);
 
+    const cache = this.app.metadataCache.getFileCache(activeFile);
+    return cache?.frontmatter ?? {};
+  }
+
+  // 获取 frontmatter 中指定 key 的值，若不存在则返回默认值
+  getFrontmatterValue<T>(key: string, defaultValue: T|undefined = undefined): T|undefined {
     let value = defaultValue;
-    if (cache?.frontmatter && cache.frontmatter.hasOwnProperty(key)) {
-      value = cache.frontmatter[key];
+    const frontmatter = this.getFrontmatter();
+    if (frontmatter.hasOwnProperty(key)) {
+      value = frontmatter[key] as T;
     }
     return value;
   }
@@ -70,8 +78,7 @@ export default class Helper {
       return [];
     }
 
-    let value = editor.getValue();
-    return this.getImageLink(value);
+    return this.getImageLink(editor.getValue());
   }
 
   getImageLink(value: string): Image[] {
@@ -125,5 +132,14 @@ export default class Helper {
     const domain = url.hostname;
 
     return blackDomainList.some(blackDomain => domain.includes(blackDomain));
+  }
+
+  // 生成 Markdown 文件链接
+  async makeFileLink(buffer: ArrayBuffer, path: string, name: string = ''): Promise<string> {
+    const imagetype = await imageType(buffer);
+    if (imagetype) {
+        return `![${name}](${encodeURI(path)})`
+    }
+    return `[${name}](${encodeURI(path)})`
   }
 }

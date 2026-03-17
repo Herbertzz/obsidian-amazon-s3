@@ -1,0 +1,212 @@
+import { fileTypeFromBuffer } from "file-type";
+import Helper from "helper";
+import { App, Modal, normalizePath, Notice, Platform, requestUrl, TFile } from "obsidian";
+import { join, parse, relative } from "path-browserify";
+import { FileData } from "types";
+import { getUrlAsset } from "utils";
+
+interface DownloadResponse {
+    success: boolean;
+    error?: string;
+    data?: ArrayBuffer;
+}
+
+export class Downloader {
+    private app: App;
+    private helper: Helper;
+
+    constructor(app: App) {
+        this.app = app;
+        this.helper = new Helper(app);
+    }
+
+    // 下载所有网络图片并替换链接
+    async downloadAll() {
+        const activeFile = this.app.workspace.getActiveFile();
+
+        // 确保下载目录存在
+        const saveDir = await this.app.fileManager.getAvailablePathForAttachment("");
+        if (!(await this.app.vault.adapter.exists(saveDir))) {
+            await this.app.vault.adapter.mkdir(saveDir);
+        }
+
+        // 筛选出网络文件
+        const fileArray: FileData[] = []
+        const files = this.helper.getAllFiles();
+        for (const file of files) {
+            if (!file.path.startsWith("http")) {
+                continue;
+            }
+
+            const url = file.path;
+            const asset = getUrlAsset(url);
+            let name = decodeURI(parse(asset).name).replace(/[\\\\/:*?\"<>|]/g, "-");
+
+            fileArray.push({
+                path: file.path,
+                name: name,
+                source: file.source,
+                type: 'network',
+            });
+        }
+
+        if (fileArray.length === 0) {
+            new Notice("没有需要下载的网络图片");
+            return;
+        }
+
+        // 下载文件并保存
+        new Notice(`共找到 ${fileArray.length} 个网络图片，正在下载...`);
+        const downloadedFiles: FileData[] = [];
+        for (const file of fileArray) {
+            const response = await this.downloadByReferer(file.path);
+            if (!response.success) {
+                new Notice(`下载 ${file.path} 失败: ${response.error}`);
+                continue;
+            }
+            if (!response.data) {
+                new Notice(`下载 ${file.path} 失败: 没有数据`);
+                continue;
+            }
+
+            const fileType = await fileTypeFromBuffer(response.data);
+            const ext = fileType?.ext ? `.${fileType.ext}` : "";
+            const savePath = normalizePath(join(saveDir, `${file.name}${ext}`));
+            await this.app.vault.adapter.writeBinary(savePath, response.data);
+            new Notice(`下载 ${file.path} 成功，保存为 ${savePath}`);
+
+            downloadedFiles.push({
+                path: savePath,
+                name: file.name,
+                source: file.source,
+                type: 'local',
+                data: response.data,
+            });
+        }
+
+        // 更新文件链接
+        const activeFolder = this.app.workspace.getActiveFile()?.parent?.path;
+        let value = this.helper.getValue() ?? "";
+        for (const file of downloadedFiles) {
+            if (file.type === 'local' && activeFolder) {
+                const relativePath = relative(normalizePath(activeFolder), normalizePath(file.path));
+                const link = await this.helper.makeFileLink(file.data!, relativePath, file.name);
+                value = value.replace(file.source, link);
+            }
+        }
+        const currentFile = this.app.workspace.getActiveFile();
+        if (activeFile?.path !== currentFile?.path) {
+            new Notice("当前文件已变更，下载失败");
+            return;
+        }
+        this.helper.setValue(value);
+
+        new Notice("下载完成");
+    }
+
+    private async downloadByReferer(url: string): Promise<DownloadResponse> {
+        if (!Platform.isDesktopApp) {
+            return { success: false, error: "移动端不支持通过 Referer 下载" };
+        }
+
+        try {
+            const response = await requestUrl({
+                url: url,
+                method: "GET",
+                headers: {
+                    "Accept": "*/*",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                    "Referer": await this.getReferer(),
+                }
+            });
+
+            if (response.status !== 200) {
+                return { success: false, error: `下载失败，HTTP 状态码: ${response.status}` };
+            }
+
+            return {
+                success: true,
+                data: response.arrayBuffer
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
+    }
+
+    private async getReferer(): Promise<string> {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) {
+            return "";
+        }
+
+        // 优先从当前文件的 frontmatter 中获取 referer
+        const frontmatter = this.helper.getFrontmatter();
+        const targetKey = ["referer", "referrer", "source", "origin"].find(key => typeof frontmatter[key] === "string" && /^https?:\/\//i.test(frontmatter[key]))
+        if (targetKey) {
+            const referfer = frontmatter[targetKey];
+            new Notice(`找到目标 Referer: ${referfer}`);
+            return referfer;
+        }
+
+        // 如果 frontmatter 中没有，则弹窗让用户输入 referer
+        return new Promise((resolve) => {
+            const modal = new RefererModal(this.app, (referfer) => {
+                resolve(referfer.trim());
+            });
+            modal.open();
+        });
+    }
+
+}
+
+// 输入 Referer 的 Modal
+class RefererModal extends Modal {
+    private callback: (referer: string) => void;
+
+    constructor(app: App, callback: (referer: string) => void) {
+        super(app);
+        this.callback = callback;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty(); // 清空内容
+        contentEl.createEl("label", {
+            text: "输入 Referer(URL):",
+        });
+
+        contentEl.createEl("br");
+
+        const input = contentEl.createEl("input", {
+            type: "text",
+            placeholder: "https://example.com/xxx/",
+        });
+        input.style.margin = "0.6em";
+        input.style.marginLeft = "0";
+        input.style.width = "85%";
+
+        const confirmButton = contentEl.createEl("button", { text: "确定" });
+        confirmButton.addEventListener("click", () => {
+            const referer = input.value;
+            if (!referer) {
+                new Notice("Referer 为空！");
+            }
+            this.callback(referer);
+            this.close();
+        });
+
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                confirmButton.click();
+            }
+        });
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
