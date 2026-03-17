@@ -109,31 +109,52 @@ export class Downloader {
             return { success: false, error: "移动端不支持通过 Referer 下载" };
         }
 
-        try {
-            const response = await requestUrl({
-                url: url,
-                method: "GET",
-                headers: {
-                    "Accept": "*/*",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-                    "Referer": await this.getReferer(),
-                }
-            });
+        const options = {
+            headers: {
+                Accept: "*/*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                Referer: await this.getReferer(),
+            },
+            // rejectUnauthorized: false, // 调试自签名证书时解除注释
+        };
 
-            if (response.status !== 200) {
-                return { success: false, error: `下载失败，HTTP 状态码: ${response.status}` };
+        return new Promise((resolve) => {
+            try {
+                const client = url.startsWith("https") ? require("https") : require("http");
+                client
+                    .get(url, options, (res: any) => {
+                        if (res.statusCode !== 200) {
+                            res.resume(); // 消费响应数据以释放内存
+                            resolve({ success: false, error: `请求失败，状态码: ${res.statusCode}` });
+                            return;
+                        }
+
+                        // 2. 拼接二进制数据块
+                        const chunks: Buffer[] = [];
+                        res.on("data", (chunk: Buffer) => {
+                            chunks.push(chunk);
+                        });
+
+                        // 3. 数据接收完毕
+                        res.on("end", () => {
+                            const finalBuffer = Buffer.concat(chunks);
+                            const arrayBuffer = finalBuffer.buffer.slice(
+                                finalBuffer.byteOffset,
+                                finalBuffer.byteOffset + finalBuffer.byteLength
+                            );
+                            resolve({ success: true, data: arrayBuffer });
+                        });
+                    })
+                    .on("error", (error: Error) => {
+                        resolve({ success: false, error: error.message });
+                    });
+            } catch (error) {
+                resolve({
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error)
+                });
             }
-
-            return {
-                success: true,
-                data: response.arrayBuffer
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-            };
-        }
+        });
     }
 
     private async getReferer(): Promise<string> {

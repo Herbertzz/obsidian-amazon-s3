@@ -90,18 +90,12 @@ export default class Helper {
     for (const match of matches) {
       const source = match[0];
 
-      let name = match[1];
-      let path = match[2];
-      if (name === undefined) {
-        name = match[3];
-      }
-      if (path === undefined) {
-        path = match[4];
-      }
+      const name = match[1] ?? match[3] ?? match[5] ?? "";
+      const path = match[2] ?? match[4] ?? match[6] ?? "";
 
       fileArray.push({
-        path: path ?? "",
-        name: name ?? "",
+        path: path,
+        name: name,
         source: source,
       });
     }
