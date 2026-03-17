@@ -77,11 +77,11 @@ export class Uploader {
         }
 
         if (fileList.length === 0) {
-            new Notice("没有找到任何图片！");
+            new Notice("没有找到任何文件！");
             return;
-        } else {
-            new Notice(`已找到 ${fileList.length} 张图片！`);
         }
+
+        new Notice(`已找到 ${fileList.length} 个文件！`);
 
         // 下载网络文件到本地
         if (this.settings.workOnNetWork) {
