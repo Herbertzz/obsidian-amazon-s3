@@ -140,7 +140,29 @@ export class Uploader {
             return;
         }
 
-        this.replaceImage(fileList, uploadUrlList);
+        // 替换上传的图片
+        const editorContent = this.helper.getValue();
+        if (!editorContent) {
+            new Notice("无法获取编辑器内容！");
+            return;
+        }
+
+        let content: string = editorContent;
+        fileList.map(item => {
+            const uploadImage = uploadUrlList.shift();
+            content = content.split(item.source).join(`![${item.name}](${uploadImage})`);
+        });
+
+        this.helper.setValue(content);
+
+        // 删除本地原文件
+        if (this.settings.deleteSource) {
+            fileList.map(file => {
+                if (file.tfile && file.type === 'local') {
+                    this.app.fileManager.trashFile(file.tfile);
+                }
+            });
+        }
     }
 
     // 监听文件菜单的上传操作
@@ -205,88 +227,6 @@ export class Uploader {
         }
 
         new Notice(`文件 ${file.name} 已上传并替换 ${backlinks.length} 个链接！`);
-    }
-
-    private async upload(tfile: TFile): Promise<string> {
-        const fileData = await this.app.vault.readBinary(tfile);
-        return this.updateByBuffer(tfile.name, fileData);
-    }
-
-    private async uploadByFile(file: File): Promise<string> {
-        const fileData = await file.arrayBuffer();
-        return this.updateByBuffer(file.name, fileData)
-    }
-
-    private async updateByBuffer(filename: string, buffer: ArrayBuffer): Promise<string> {
-        const fileType = await fileTypeFromBuffer(buffer);
-
-        // 生成唯一的 S3 Key (文件路径)
-        const uploadPath = await TemplateParser.uploadPath(
-            this.settings.uploadPathTemplate,
-            filename,
-            fileType?.ext ?? '',
-            buffer
-        );
-
-        // 初始化 S3 客户端
-        const clientConfig: S3ClientConfig = {
-            region: this.settings.region,
-            credentials: {
-                accessKeyId: this.settings.accessKeyId,
-                secretAccessKey: this.settings.secretAccessKey,
-            },
-            forcePathStyle: this.settings.forcePathStyle,
-        };
-        if (this.settings.endpoint) {
-            clientConfig.endpoint = this.settings.endpoint;
-        }
-        const client = new S3Client(clientConfig);
-
-        // 构建并发送上传命令
-        const command = new PutObjectCommand({
-            Bucket: this.settings.bucket,
-            Key: uploadPath,
-            Body: new Uint8Array(buffer),
-            ContentType: fileType?.mime ?? 'application/octet-stream',
-            // ACL: 'public-read', // 如果你的 Bucket 策略要求显式声明公共读权限，可以取消注释
-        });
-        await client.send(command);
-
-        // 构建返回的 URL
-        const uploadedPath = uploadPath.split('/').map(part => encodeURIComponent(part)).join('/');
-        return TemplateParser.outputURL(this.settings.outputURLTemplate, {
-            endpoint: this.settings.endpoint,
-            bucket: this.settings.bucket,
-            region: this.settings.region,
-        }, uploadedPath);
-    }
-
-    /**
-     * 替换上传的图片
-     */
-    private replaceImage(fileList: FileInfoWithTFile[], uploadUrlList: string[]) {
-        const editorContent = this.helper.getValue();
-        if (!editorContent) {
-            new Notice("无法获取编辑器内容！");
-            return;
-        }
-
-        let content: string = editorContent;
-        fileList.map(item => {
-            const uploadImage = uploadUrlList.shift();
-            content = content.split(item.source).join(`![${item.name}](${uploadImage})`);
-        });
-
-        this.helper.setValue(content);
-
-        // 删除本地原文件
-        if (this.settings.deleteSource) {
-            fileList.map(file => {
-                if (file.tfile && file.type === 'local') {
-                    this.app.fileManager.trashFile(file.tfile);
-                }
-            });
-        }
     }
 
     // 监听剪贴板事件，自动上传图片
@@ -373,7 +313,7 @@ export class Uploader {
             this.insertTemporaryText(editor, pasteId);
 
             try {
-                const url = await this.uploadByFile(file);
+                const url = await this.upload(file);
                 if (url) {
                     const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
                     this.embedMarkdownLink(editor, pasteId, fileType?.ext ?? '', url, file.name);
@@ -413,13 +353,70 @@ export class Uploader {
                 continue;
             }
 
-            const url = await this.uploadByFile(file);
+            const url = await this.upload(file);
 
             const id = this.makeID();
             this.insertTemporaryText(editor, id);
             const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
             this.embedMarkdownLink(editor, id, fileType?.ext ?? '', url, file.name);
         }
+    }
+
+    // 核心上传函数，支持 TFile、File 和 ArrayBuffer 三种输入
+    private async upload(file: TFile | File | ArrayBuffer, filename?: string): Promise<string> {
+        let buffer: ArrayBuffer;
+        if (file instanceof TFile) {
+            buffer = await this.app.vault.readBinary(file);
+            filename = filename || file.name;
+        } else if (file instanceof File) {
+            buffer = await file.arrayBuffer();
+            filename = filename || file.name;
+        } else {
+            buffer = file;
+            filename = filename || "unknown";
+        }
+
+        const fileType = await fileTypeFromBuffer(buffer);
+
+        // 生成唯一的 S3 Key (文件路径)
+        const uploadPath = await TemplateParser.uploadPath(
+            this.settings.uploadPathTemplate,
+            filename,
+            fileType?.ext ?? '',
+            buffer
+        );
+
+        // 初始化 S3 客户端
+        const clientConfig: S3ClientConfig = {
+            region: this.settings.region,
+            credentials: {
+                accessKeyId: this.settings.accessKeyId,
+                secretAccessKey: this.settings.secretAccessKey,
+            },
+            forcePathStyle: this.settings.forcePathStyle,
+        };
+        if (this.settings.endpoint) {
+            clientConfig.endpoint = this.settings.endpoint;
+        }
+        const client = new S3Client(clientConfig);
+
+        // 构建并发送上传命令
+        const command = new PutObjectCommand({
+            Bucket: this.settings.bucket,
+            Key: uploadPath,
+            Body: new Uint8Array(buffer),
+            ContentType: fileType?.mime ?? 'application/octet-stream',
+            // ACL: 'public-read', // 如果你的 Bucket 策略要求显式声明公共读权限，可以取消注释
+        });
+        await client.send(command);
+
+        // 构建返回的 URL
+        const uploadedPath = uploadPath.split('/').map(part => encodeURIComponent(part)).join('/');
+        return TemplateParser.outputURL(this.settings.outputURLTemplate, {
+            endpoint: this.settings.endpoint,
+            bucket: this.settings.bucket,
+            region: this.settings.region,
+        }, uploadedPath);
     }
 
     // 生成一个随机 ID，用于临时占位符
