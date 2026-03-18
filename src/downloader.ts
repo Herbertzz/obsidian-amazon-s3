@@ -31,6 +31,25 @@ interface DownloadResult {
     mimeType?: string; // 文件 MIME 类型, 从文件内容解析得到
 }
 
+interface NodeResponse {
+    statusCode?: number;
+    headers: Record<string, string>;
+    resume(): void;
+    on(event: "data", listener: (chunk: Uint8Array) => void): NodeResponse;
+    on(event: "end", listener: () => void): NodeResponse;
+    on(event: string, listener: (...args: unknown[]) => void): NodeResponse;
+}
+
+interface NodeRequest {
+    on(event: string, listener: (error: Error) => void): NodeRequest;
+    end(): void;
+}
+
+interface NodeTransport {
+    request(url: string, options: Record<string, unknown>, callback: (res: NodeResponse) => void): NodeRequest;
+    get(url: string, options: Record<string, unknown>, callback: (res: NodeResponse) => void): NodeRequest;
+}
+
 // 定义防盗链匹配规则字典
 const REFERER_RULES = [
     { domain: "sspai.com", referer: "https://sspai.com" },
@@ -45,6 +64,17 @@ const REFERER_RULES = [
     { domain: "mmbiz.qpic.cn", referer: "https://mp.weixin.qq.com/" },
     { domain: "qpic.cn", referer: "https://mp.weixin.qq.com/" }
 ];
+
+function nodeRequestClient(url: string) {
+    const globalRequire = (window as unknown as { require?: (id: string) => unknown }).require;
+    if (!globalRequire) {
+        throw new Error("无法获取 require 函数，无法进行 Node 请求");
+    }
+
+    return url.startsWith("https")
+        ? (globalRequire("https") as NodeTransport)
+        : (globalRequire("http") as NodeTransport);
+}
 
 export class Downloader {
     private app: App;
@@ -251,24 +281,22 @@ export class Downloader {
 
         return new Promise((resolve) => {
             try {
-                /* eslint-disable */
-                const client = url.startsWith("https") ? require("https") : require("http");
-                client.request(url, options, (res: any) => {
-                    if (res.statusCode !== 200) {
-                        resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
-                        return;
-                    }
+                nodeRequestClient(url)
+                    .request(url, options, (res: NodeResponse) => {
+                        if (res.statusCode !== 200) {
+                            resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
+                            return;
+                        }
 
-                    resolve({
-                        success: true,
-                        headers: res.headers
-                    });
-                })
+                        resolve({
+                            success: true,
+                            headers: res.headers
+                        });
+                    })
                     .on("error", (error: Error) => {
                         resolve({ success: false, reason: error.message });
                     })
                     .end();
-                /* eslint-enable */
             } catch (error) {
                 resolve({
                     success: false,
@@ -356,10 +384,8 @@ export class Downloader {
 
         return new Promise((resolve) => {
             try {
-                /* eslint-disable */
-                const client = url.startsWith("https") ? require("https") : require("http");
-                client
-                    .get(url, options, (res: any) => {
+                nodeRequestClient(url)
+                    .get(url, options, (res: NodeResponse) => {
                         if (res.statusCode !== 200) {
                             res.resume(); // 消费响应数据以释放内存
                             resolve({ success: false, error: `请求失败，状态码: ${res.statusCode}` });
@@ -373,18 +399,35 @@ export class Downloader {
                             return;
                         }
 
+                        const chunks: Uint8Array[] = [];
+
                         // 拼接二进制数据块
-                        const chunks: Buffer[] = [];
-                        res.on("data", (chunk: Buffer) => {
+                        res.on("data", (chunk: Uint8Array) => {
                             chunks.push(chunk);
                         });
 
                         // 数据接收完毕
                         res.on("end", () => {
-                            const finalBuffer = Buffer.concat(chunks);
-                            const arrayBuffer = finalBuffer.buffer.slice(
-                                finalBuffer.byteOffset,
-                                finalBuffer.byteOffset + finalBuffer.byteLength
+                            // 计算所有数据块的总长度
+                            let totalLength = 0;
+                            for (const chunk of chunks) {
+                                totalLength += chunk.length;
+                            }
+
+                            // 创建一个足够大的全新 Uint8Array
+                            const finalArray = new Uint8Array(totalLength);
+
+                            // 将所有分块按顺序填充进去
+                            let offset = 0;
+                            for (const chunk of chunks) {
+                                finalArray.set(chunk, offset);
+                                offset += chunk.length;
+                            }
+
+                            // 安全提取纯净的 ArrayBuffer
+                            const arrayBuffer = finalArray.buffer.slice(
+                                finalArray.byteOffset,
+                                finalArray.byteOffset + finalArray.byteLength
                             );
                             resolve({ success: true, data: arrayBuffer });
                         });
@@ -392,7 +435,6 @@ export class Downloader {
                     .on("error", (error: Error) => {
                         resolve({ success: false, error: error.message });
                     });
-                /* eslint-enable */
             } catch (error) {
                 resolve({
                     success: false,
