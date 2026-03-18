@@ -1,90 +1,160 @@
-# Obsidian Sample Plugin
+# Amazon S3 Uploader for Obsidian
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+将 Obsidian 中的本地图片/附件或网络资源上传到 S3（或兼容 S3 的对象存储），并自动替换为远程链接。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 功能特性
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- 批量上传当前笔记中的本地附件与图片。
+- 批量下载当前笔记中的网络图片/文件并替换为本地链接。
+- 支持剪贴板自动上传（粘贴时自动上传）。
+- 支持拖拽自动上传（按住 `Ctrl/Cmd` 可走 Obsidian 默认行为）。
+- 文件右键菜单支持“上传到 S3”，并自动回填所有反向引用。
+- 支持下载代理与 Referer 规则（处理防盗链场景）。
+- 支持上传路径模板、输出 URL 模板。
+- 支持图片/文件扩展名白名单控制。
 
-## First time developing plugins?
+## 安装
 
-Quick starting guide for new plugin devs:
+### 手动安装
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. 在你的 Vault 中创建目录：`.obsidian/plugins/amazon-s3-uploader/`
+2. 将 `main.js`、`manifest.json`、`styles.css` 复制到该目录
+3. 重启 Obsidian（或刷新社区插件）
+4. 在 **Settings → Community plugins** 中启用插件
 
-## Releasing new releases
+## 快速开始
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+1. 打开插件设置，填写 S3 参数：
+   - `Access key ID`
+   - `Secret access key`
+   - `Region`
+   - `Bucket`
+   - `Endpoint`（使用兼容 S3 服务时通常必填）
+2. 设置上传路径模板（默认：`{year}/{month}/{fullName}`）
+3. 设置输出 URL 模板（默认：`{endpoint}/{bucket}/{path}`）
+4. 在命令面板执行：
+   - `上传所有图片`
+   - `下载所有图片`
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## 命令
 
-## Adding your plugin to the community plugin list
+- `上传所有图片`：扫描当前笔记链接并上传可处理文件。
+- `下载所有图片`：下载当前笔记中的网络资源并替换为本地链接。
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## 右键菜单
 
-## How to use
+在文件资源管理器中，对允许类型的文件右键可见：
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+- `上传到 S3`
 
-## Manually installing the plugin
+执行后会自动替换所有引用该文件的 Markdown 链接（含普通链接和嵌入链接）。
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+## 支持匹配的链接格式
 
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+### Markdown 格式
 
-## Funding URL
+- `![alt](<./path/image.png>)`
+- `![alt](./path/image.png)`
+- `![alt](image.png "title")`
+- `![alt](https://example.com/file)`
+- `[text](./path/file.pdf)`
 
-You can include funding URLs where people who use your plugin can financially support it.
+### Wiki 格式
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+- `![[image.png]]`
+- `![[image.png|alias]]`
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+## 设置项说明
+
+### 基础设置
+
+- `自定义节点(endpoint)`：兼容 S3 服务通常需要填写。
+- `访问密钥 ID / 访问密钥`：S3 鉴权凭证。
+- `地区(region)`：例如 `us-east-1`。
+- `桶名(bucket)`：目标 Bucket。
+- `强制路径样式(forcePathStyle)`：部分兼容 S3 服务需要开启。
+
+### 路径与 URL 模板
+
+- `上传路径模板(uploadPathTemplate)`：决定对象 Key。
+- `输出 URL 模板(outputURLTemplate)`：决定回填到文档中的 URL。
+
+支持占位符：
+
+- 时间：`{year}` `{month}` `{day}` `{hour}` `{minute}` `{second}` `{millisecond}`
+- 时间戳：`{timestamp}` `{timestampMS}`
+- 文件名：`{fullName}` `{fileName}` `{extName}`
+- 哈希：`{md5}` `{sha1}` `{sha256}`
+- URL：`{endpoint}` `{bucket}` `{path}`
+
+### 自动上传与网络资源
+
+- `应用网络图片(workOnNetWork)`：上传/粘贴时处理网络资源。
+- `网络图片域名黑名单(newWorkBlackDomains)`：逗号分隔。
+- `上传文件后移除源文件(deleteSource)`：上传后删除本地源文件。
+- `剪切板自动上传(uploadByClipboardSwitch)`
+- `当剪切板中同时拥有文本和图片时，是否上传图片(applyImage)`
+- `拖拽自动上传(uploadByDropSwitch)`
+
+### 下载相关
+
+- `文件下载代理(downloadProxy)`：使用 `{url}` 占位符拼接目标地址。
+- `Referer 规则(refererRules)`：每行一条，格式：`domain,referer`。
+
+### 类型白名单
+
+- `允许上传下载的图片扩展名(allowedImageTypes)`
+- `允许上传下载的文件扩展名(allowedFileTypes)`
+
+只有白名单中的类型会被上传/下载处理。
+
+## Frontmatter 控制
+
+可在笔记 frontmatter 中通过 `image-auto-upload` 覆盖自动上传开关：
+
+```yaml
+image-auto-upload: true
 ```
 
-If you have multiple URLs, you can also do:
+下载防盗链场景下，还会优先从当前笔记 frontmatter 读取 Referer（可用键名）：
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+- `referer`
+- `referrer`
+- `source`
+- `origin`
+
+## 开发
+
+```bash
+npm install
+npm run dev
 ```
 
-## API Documentation
+构建生产包：
 
-See https://docs.obsidian.md
+```bash
+npm run build
+```
+
+代码检查：
+
+```bash
+npm run lint
+```
+
+## 版本发布
+
+1. 更新 `manifest.json` 中 `version`
+2. 更新 `versions.json`（版本到最小 Obsidian 版本映射）
+3. 发布同名 GitHub Release（tag 不加 `v`）
+4. 上传 `main.js`、`manifest.json`、`styles.css`
+
+## 注意事项
+
+- 请确保 Bucket 具备正确的写入权限。
+- 若希望链接可直接访问，请配置对象读取权限或 CDN 策略。
+- 建议先在测试 Vault 验证模板与权限配置。
+
+## License
+
+0-BSD
