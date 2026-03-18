@@ -71,14 +71,26 @@ export default class Helper {
 
     setValue(value: string) {
         const editor = this.getEditor();
-        if (!editor) {
-            return;
-        }
+        if (!editor) return;
 
+        // 记下原本的滚动条和光标位置
         const { left, top } = editor.getScrollInfo();
         const position = editor.getCursor();
 
         editor.setValue(value);
+
+        // 设置新内容后，校验光标位置是否越界，如果越界则调整到合理位置
+        const lastLineIndex = editor.lineCount() - 1;
+        if (position.line > lastLineIndex) {
+            position.line = lastLineIndex;
+            position.ch = editor.getLine(lastLineIndex).length;
+        } else {
+            // 如果行号没越界，但这一行变短了，校验字符位置
+            const currentLineLength = editor.getLine(position.line).length;
+            if (position.ch > currentLineLength) {
+                position.ch = currentLineLength;
+            }
+        }
         editor.scrollTo(left, top);
         editor.setCursor(position);
     }
