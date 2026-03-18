@@ -22,20 +22,6 @@ const REGEX_FILE = /\!?\[(.*?)\]\(<(\S+\.\w+)>\)|\!?\[(.*?)\]\((\S+\.\w+)(?:\s+"
 //   ![[image.png|alias]]    带别名的 Wiki 风格图片嵌入
 const REGEX_WIKI_FILE = /\!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
 
-const IMAGE_EXT_LIST = [
-    "jpg",
-    "jpeg",
-    "png",
-    "gif",
-    "webp",
-    "svg",
-    "tiff",
-    "bmp",
-    "ico",
-    "avif",
-    "heic",
-    "heif",
-];
 
 export default class Helper {
     private app: App;
@@ -202,7 +188,7 @@ export default class Helper {
 
     // 判断文件是否为图片
     isImage(ext: string) {
-        return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+        return this.settings.allowedImageTypes.includes(ext.toLowerCase());
     }
 
     // 根据文件内容识别文件类型，返回扩展名和 MIME 类型

@@ -3,7 +3,7 @@
 	"name": "Amazon S3 Uploader",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Amazon S3 上传插件",
+	"description": "Amazon S3 上传下载插件",
 	"author": "Herbertzz",
 	"authorUrl": "https://obsidian.md",
 	"fundingUrl": "https://obsidian.md/pricing",
