@@ -137,6 +137,11 @@ export class Downloader {
     }
 
     async download(url: string): Promise<DownloadResult> {
+        const precheckResult = await this.precheckDownload(url);
+        if (!precheckResult.canDownload) {
+            return { success: false, error: precheckResult.reason };
+        }
+
         const response = await this.smartDownload(url);
         if (!response.success) {
             console.error(`下载失败: ${url} ${response.error}`);
