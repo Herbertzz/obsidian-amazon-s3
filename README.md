@@ -155,6 +155,11 @@ npm run lint
 - 若希望链接可直接访问，请配置对象读取权限或 CDN 策略。
 - 建议先在测试 Vault 验证模板与权限配置。
 
-## License
+## 参考项目
 
-0-BSD
+本项目在以下方向上参考了社区实现思路，并结合当前插件需求进行了整合与扩展：
+
+- 防盗链下载（Referer 能力）参考：
+   - https://github.com/lovelyjuice/hotlink-protection-image-downloader
+- Obsidian 图片自动上传交互与工作流参考：
+   - https://github.com/renmu123/obsidian-image-auto-upload-plugin
