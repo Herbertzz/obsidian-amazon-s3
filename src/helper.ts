@@ -1,7 +1,7 @@
 import { fileTypeFromBuffer } from "file-type";
 import { MarkdownView, App, TFile } from "obsidian";
 import { parse } from "path-browserify";
-import { AmazonS3UploaderPluginSettings } from "settings";
+import { AmazonS3UploaderPluginSettings } from "./settings";
 import { AnyObj } from "types";
 
 interface Link {

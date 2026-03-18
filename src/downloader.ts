@@ -1,9 +1,9 @@
 import { fileTypeFromBuffer } from "file-type";
-import Helper from "helper";
+import Helper from "./helper";
 import { App, Modal, normalizePath, Notice, Platform, requestUrl } from "obsidian";
 import { join, relative } from "path-browserify";
-import { AmazonS3UploaderPluginSettings } from "settings";
-import { FileData } from "types";
+import { AmazonS3UploaderPluginSettings } from "./settings";
+import { FileData } from "./types";
 import * as mime from "mime-types";
 
 interface DownloadResponse {

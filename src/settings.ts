@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import AmazonS3UploaderPlugin from "./main";
-import { RefererRule } from "types";
+import { RefererRule } from "./types";
 
 export interface AmazonS3UploaderPluginSettings {
 	// 凭证 ID

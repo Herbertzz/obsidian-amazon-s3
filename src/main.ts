@@ -1,8 +1,8 @@
 import { MarkdownView, Menu, MenuItem, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from 'obsidian';
 import { DEFAULT_SETTINGS, AmazonS3UploaderPluginSettings, AmazonS3UploaderSettingTab } from "settings";
-import { Uploader } from 'uploader';
-import { Downloader } from 'downloader';
-import Helper from 'helper';
+import { Uploader } from './uploader';
+import { Downloader } from './downloader';
+import Helper from './helper';
 
 
 export default class AmazonS3UploaderPlugin extends Plugin {
