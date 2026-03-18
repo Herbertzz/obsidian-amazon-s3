@@ -101,6 +101,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('自定义节点')
 			.addText(text => text
+				// eslint-disable-next-line obsidianmd/ui/sentence-case
 				.setPlaceholder('使用 AWS S3 时可不填，使用第三方兼容 S3 的服务时必填')
 				.setValue(this.plugin.settings.endpoint)
 				.onChange(async (value) => {
@@ -275,7 +276,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("当剪切板中同时拥有文本和图片时, 是否上传图片")
-			.setDesc("当你复制时，某些应用例如 Excel 会在剪切板同时文本和图像数据，确认是否上传。")
+			.setDesc("当你复制时，某些应用会在剪切板中同时写入文本和图像数据，确认是否上传。")
 			.addToggle(toggle =>
 				toggle
 					.setValue(this.plugin.settings.applyImage)
@@ -288,7 +289,8 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("拖拽自动上传")
-			.setDesc("启用该选项后，拖拽图片时会自动上传。如果按住了 Ctrl/Cmd，放行，执行 Obsidian 默认行为（保存到本地）	")
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
+			.setDesc("启用该选项后，拖拽图片时会自动上传。如果按住 Ctrl/Cmd，将放行并执行 Obsidian 默认行为（保存到本地）。")
 			.addToggle(toggle =>
 				toggle
 					.setValue(this.plugin.settings.uploadByDropSwitch)

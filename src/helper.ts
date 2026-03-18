@@ -2,7 +2,6 @@ import { fileTypeFromBuffer } from "file-type";
 import { MarkdownView, App, TFile } from "obsidian";
 import { parse } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "./settings";
-import { AnyObj } from "types";
 
 interface Link {
     path: string;
@@ -16,11 +15,11 @@ interface Link {
 //   ![alt](./path/image.png)      标准 Markdown 图片/文件链接（路径中需含扩展名）
 //   ![alt](image.png "title")     带可选标题的本地链接
 //   ![alt](https://example.com/x) 网络链接（http/https，无需扩展名）
-const REGEX_FILE = /\!?\[(.*?)\]\(<(\S+\.\w+)>\)|\!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|\!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
+const REGEX_FILE = /!?\[(.*?)\]\(<(\S+\.\w+)>\)|!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
 // REGEX_WIKI_FILE 可匹配以下格式：
 //   ![[image.png]]          Wiki 风格图片嵌入
 //   ![[image.png|alias]]    带别名的 Wiki 风格图片嵌入
-const REGEX_WIKI_FILE = /\!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
+const REGEX_WIKI_FILE = /!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
 
 
 export default class Helper {
@@ -33,7 +32,7 @@ export default class Helper {
     }
 
     // 获取当前文件的 frontmatter 对象
-    getFrontmatter(): Record<string, any> {
+    getFrontmatter(): Record<string, unknown> {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) {
             return {};
@@ -47,7 +46,7 @@ export default class Helper {
     getFrontmatterValue<T>(key: string, defaultValue: T | undefined = undefined): T | undefined {
         let value = defaultValue;
         const frontmatter = this.getFrontmatter();
-        if (frontmatter.hasOwnProperty(key)) {
+        if (key in frontmatter) {
             value = frontmatter[key] as T;
         }
         return value;
@@ -258,11 +257,12 @@ export default class Helper {
     }
 
     // 将数组转换为对象，key 为对象的某个属性值，value 为对象本身
-    arrayToObject<T extends AnyObj>(arr: T[], key: string): { [key: string]: T } {
-        const obj: { [key: string]: T } = {};
-        arr.forEach(element => {
-            obj[element[key]] = element;
-        });
+    arrayToObject<T, K extends keyof T>(arr: T[], key: K): Record<string, T> {
+        const obj: Record<string, T> = {};
+        for (const element of arr) {
+            const objectKey = String(element[key]);
+            obj[objectKey] = element;
+        }
         return obj;
     }
 }

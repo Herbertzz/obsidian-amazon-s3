@@ -159,7 +159,7 @@ export class Uploader {
         if (this.settings.deleteSource) {
             fileList.map(file => {
                 if (file.tfile && file.type === 'local') {
-                    this.app.fileManager.trashFile(file.tfile);
+                    void this.app.fileManager.trashFile(file.tfile);
                 }
             });
         }
@@ -183,12 +183,10 @@ export class Uploader {
         const resolvedLinks = this.app.metadataCache.resolvedLinks;
         for (const linkPath in resolvedLinks) {
             if (resolvedLinks?.[linkPath]?.[file.path]) {
-                console.log(`File ${file.path} is linked in ${linkPath}`);
                 const linkFile = this.app.vault.getAbstractFileByPath(linkPath);
                 if (!(linkFile instanceof TFile)) continue;
                 const linkFileCache = this.app.metadataCache.getFileCache(linkFile);
                 if (!(linkFileCache)) continue;
-                console.log(`cache for ${linkPath}:`, linkFileCache);
 
                 // 合并所有的普通链接和嵌入图片
                 const allLinks = [...(linkFileCache.embeds || []), ...(linkFileCache.links || [])];

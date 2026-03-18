@@ -30,7 +30,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
 					if (!checking) {
-						this.uploader.uploadAll();
+						void this.uploader.uploadAll();
 					}
 					return true;
 				}
@@ -46,7 +46,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
 					if (!checking) {
-						this.downloader.downloadAll();
+						void this.downloader.downloadAll();
 					}
 					return true;
 				}
@@ -80,7 +80,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 	}
 
 	registerMenus() {
-		this.registerEvent(this.app.workspace.on("file-menu", (menu: Menu, abstractFile: TAbstractFile, source: string, leaf?: WorkspaceLeaf): any => {
+		this.registerEvent(this.app.workspace.on("file-menu", (menu: Menu, abstractFile: TAbstractFile, source: string, leaf?: WorkspaceLeaf): boolean | void => {
 			if (source === "canvas-menu") return false;
 			// 必须是真实的文件，绝对不能是文件夹 (TFolder)
 			if (!(abstractFile instanceof TFile)) return false;
@@ -92,7 +92,7 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 					.setIcon("cloud-upload-s3")
 					.onClick(() => {
 						if (!(abstractFile instanceof TFile)) return;
-						this.uploader.fileMenuUpload(abstractFile);
+						void this.uploader.fileMenuUpload(abstractFile);
 					});
 			});
 		}));

@@ -59,6 +59,7 @@ export class Downloader {
 
         // 获取下载存储目录路径
         // @ts-ignore 由于 getConfig 是未文档化的内部 API，官方的 .d.ts 类型定义里没有它，所以这里使用 @ts-ignore 来绕过类型检查
+        // eslint-disable-next-line
         this.saveDir = this.app.vault.getConfig("attachmentFolderPath") ?? "/";
     }
 
@@ -122,7 +123,7 @@ export class Downloader {
         for (const file of downloadedFiles) {
             if (file.type === 'local' && activeFolder) {
                 const relativePath = relative(normalizePath(activeFolder), normalizePath(file.path));
-                const link = await this.helper.makeLink(relativePath, file.name, file.realExtension);
+                const link = this.helper.makeLink(relativePath, file.name, file.realExtension);
                 value = value.replace(file.source, link);
             }
         }
@@ -156,7 +157,7 @@ export class Downloader {
         const urlObj = new URL(url);
         const pathname = decodeURI(urlObj.pathname);
         const name = pathname.substring(pathname.lastIndexOf("/") + 1)
-            .replace(/[\\\\/:*?\"<>|]/g, "-");
+            .replace(/[\\\\/:*?"<>|]/g, "-");
 
         const savePath = normalizePath(join(this.saveDir, name));
         await this.app.vault.adapter.writeBinary(savePath, response.data);
@@ -173,10 +174,9 @@ export class Downloader {
     // 预下载检查，验证 URL 的合法性、是否在黑名单中，以及 HEAD 预检
     async precheckDownload(url: string): Promise<DownloadPreCheckResult> {
         // 检查是否为合法 URL
-        let urlObj: URL;
         try {
-            urlObj = new URL(url);
-        } catch (error) {
+            new URL(url);
+        } catch {
             return { canDownload: false, reason: "无效的 URL" };
         }
 
@@ -252,23 +252,24 @@ export class Downloader {
 
         return new Promise((resolve) => {
             try {
+                /* eslint-disable */
                 const client = url.startsWith("https") ? require("https") : require("http");
-                client
-                    .request(url, options, (res: any) => {
-                        if (res.statusCode !== 200) {
-                            resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
-                            return;
-                        }
+                client.request(url, options, (res: any) => {
+                    if (res.statusCode !== 200) {
+                        resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
+                        return;
+                    }
 
-                        resolve({
-                            success: true,
-                            headers: res.headers
-                        });
-                    })
+                    resolve({
+                        success: true,
+                        headers: res.headers
+                    });
+                })
                     .on("error", (error: Error) => {
                         resolve({ success: false, reason: error.message });
                     })
                     .end();
+                /* eslint-enable */
             } catch (error) {
                 resolve({
                     success: false,
@@ -356,6 +357,7 @@ export class Downloader {
 
         return new Promise((resolve) => {
             try {
+                /* eslint-disable */
                 const client = url.startsWith("https") ? require("https") : require("http");
                 client
                     .get(url, options, (res: any) => {
@@ -372,13 +374,13 @@ export class Downloader {
                             return;
                         }
 
-                        // 2. 拼接二进制数据块
+                        // 拼接二进制数据块
                         const chunks: Buffer[] = [];
                         res.on("data", (chunk: Buffer) => {
                             chunks.push(chunk);
                         });
 
-                        // 3. 数据接收完毕
+                        // 数据接收完毕
                         res.on("end", () => {
                             const finalBuffer = Buffer.concat(chunks);
                             const arrayBuffer = finalBuffer.buffer.slice(
@@ -391,6 +393,7 @@ export class Downloader {
                     .on("error", (error: Error) => {
                         resolve({ success: false, error: error.message });
                     });
+                /* eslint-enable */
             } catch (error) {
                 resolve({
                     success: false,
@@ -423,8 +426,7 @@ export class Downloader {
         const frontmatter = this.helper.getFrontmatter();
         const targetKey = ["referer", "referrer", "source", "origin"].find(key => typeof frontmatter[key] === "string" && /^https?:\/\//i.test(frontmatter[key]))
         if (targetKey) {
-            const referfer = frontmatter[targetKey];
-            return referfer;
+            return String(frontmatter[targetKey]);
         }
 
         // 如果 frontmatter 中没有，则弹窗让用户输入 referer
@@ -451,7 +453,8 @@ class RefererModal extends Modal {
         const { contentEl } = this;
         contentEl.empty(); // 清空内容
         contentEl.createEl("label", {
-            text: "输入 Referer(URL):",
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            text: "输入 Referer URL:",
         });
 
         contentEl.createEl("br");
@@ -460,9 +463,11 @@ class RefererModal extends Modal {
             type: "text",
             placeholder: "https://example.com/xxx/",
         });
-        input.style.margin = "0.6em";
-        input.style.marginLeft = "0";
-        input.style.width = "85%";
+        input.setCssProps({
+            margin: "0.6em",
+            marginLeft: "0",
+            width: "85%",
+        });
 
         const confirmButton = contentEl.createEl("button", { text: "确定" });
         confirmButton.addEventListener("click", () => {
