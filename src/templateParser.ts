@@ -53,7 +53,7 @@ export class TemplateParser {
 			result = result.replace(/{sha256}/g, hash);
 		}
 		if (result.includes('{md5}')) {
-			const md5Hash = await this.calculateMD5(fileData);
+			const md5Hash = this.calculateMD5(fileData);
 			result = result.replace(/{md5}/g, md5Hash);
 		}
 
@@ -97,9 +97,9 @@ export class TemplateParser {
 	}
 
 	/**
-	 * 计算 MD5 (完美兼容全平台：Windows, Mac, iOS, Android)
+	 * 计算 MD5
 	 */
-	private static async calculateMD5(data: ArrayBuffer): Promise<string> {
+	private static calculateMD5(data: ArrayBuffer): string {
 		return SparkMD5.ArrayBuffer.hash(data);
 	}
 }

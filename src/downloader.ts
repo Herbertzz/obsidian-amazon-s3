@@ -57,10 +57,9 @@ export class Downloader {
         this.settings = settings;
         this.helper = new Helper(app, settings);
 
-        // 获取下载存储目录路径
-        // @ts-ignore 由于 getConfig 是未文档化的内部 API，官方的 .d.ts 类型定义里没有它，所以这里使用 @ts-ignore 来绕过类型检查
-        // eslint-disable-next-line
-        this.saveDir = this.app.vault.getConfig("attachmentFolderPath") ?? "/";
+        // 由于 getConfig 是未文档化的内部 API，官方的 .d.ts 类型定义里没有它.
+        const internalVault = this.app.vault as unknown as { getConfig: (key: string) => string | undefined };
+        this.saveDir = internalVault.getConfig("attachmentFolderPath") ?? "/";
     }
 
     // 下载所有网络文件
@@ -452,9 +451,9 @@ class RefererModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty(); // 清空内容
+
         contentEl.createEl("label", {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            text: "输入 Referer URL:",
+            text: "输入 referer:",
         });
 
         contentEl.createEl("br");

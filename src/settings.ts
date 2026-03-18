@@ -101,8 +101,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('自定义节点')
 			.addText(text => text
-				// eslint-disable-next-line obsidianmd/ui/sentence-case
-				.setPlaceholder('使用 AWS S3 时可不填，使用第三方兼容 S3 的服务时必填')
+				.setPlaceholder('使用 amazon S3 时可不填，使用第三方兼容 S3 的服务时必填')
 				.setValue(this.plugin.settings.endpoint)
 				.onChange(async (value) => {
 					this.plugin.settings.endpoint = value.trim();
@@ -289,8 +288,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("拖拽自动上传")
-			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("启用该选项后，拖拽文件时会自动上传。如果按住 Ctrl/Cmd，将放行并执行 Obsidian 默认行为（保存到本地）。")
+			.setDesc("启用该选项后，拖拽文件时会自动上传。如果按住 ctrl/cmd，将放行并执行 Obsidian 默认行为（保存到本地）。")
 			.addToggle(toggle =>
 				toggle
 					.setValue(this.plugin.settings.uploadByDropSwitch)
