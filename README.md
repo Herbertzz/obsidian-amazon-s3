@@ -1,5 +1,7 @@
 # Amazon S3 Uploader for Obsidian
 
+[English README](README.en.md)
+
 将 Obsidian 中的本地图片/附件或网络资源上传到 S3（或兼容 S3 的对象存储），并自动替换为远程链接。
 
 ## 功能特性
