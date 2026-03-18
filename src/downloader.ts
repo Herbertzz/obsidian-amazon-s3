@@ -170,27 +170,8 @@ export class Downloader {
         };
     }
 
-    // 检查响应头, 判断是否可以下载
-    private checkResponseHeader(headers: Record<string, string>): DownloadPreCheckResult {
-        const contentType = headers?.["content-type"] || "";
-
-        if (contentType.includes("text/html")) {
-            return { canDownload: false, reason: "URL 指向的是 HTML 页面" };
-        }
-
-        const ext = mime.extension(contentType) || "";
-        if (!ext) {
-            return { canDownload: false, reason: "无法识别文件类型" };
-        }
-
-        if (!this.helper.isAllowFileByExt(ext)) {
-            return { canDownload: false, reason: `文件类型 ${ext} 不允许下载` };
-        }
-        return { canDownload: true };
-    }
-
     // 预下载检查，验证 URL 的合法性、是否在黑名单中，以及 HEAD 预检
-    private async precheckDownload(url: string): Promise<DownloadPreCheckResult> {
+    async precheckDownload(url: string): Promise<DownloadPreCheckResult> {
         // 检查是否为合法 URL
         let urlObj: URL;
         try {
@@ -295,6 +276,25 @@ export class Downloader {
                 });
             }
         });
+    }
+
+    // 检查响应头, 判断是否可以下载
+    private checkResponseHeader(headers: Record<string, string>): DownloadPreCheckResult {
+        const contentType = headers?.["content-type"] || "";
+
+        if (contentType.includes("text/html")) {
+            return { canDownload: false, reason: "URL 指向的是 HTML 页面" };
+        }
+
+        const ext = mime.extension(contentType) || "";
+        if (!ext) {
+            return { canDownload: false, reason: "无法识别文件类型" };
+        }
+
+        if (!this.helper.isAllowFileByExt(ext)) {
+            return { canDownload: false, reason: `文件类型 ${ext} 不允许下载` };
+        }
+        return { canDownload: true };
     }
 
     private async smartDownload(url: string): Promise<DownloadResponse> {

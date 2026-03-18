@@ -211,12 +211,15 @@ export default class Helper {
     }
 
     // 判断文件是否允许上传下载
-    async isAllowFile(path: string, buffer?: ArrayBuffer | TFile): Promise<boolean> {
-        let ext = this.getExtension(path);
+    async isAllowFile(pathOrExt: string, buffer?: ArrayBuffer | TFile | File): Promise<boolean> {
+        let ext = this.getExtension(pathOrExt);
         // 如果没有扩展名且提供了文件数据，则尝试通过文件内容识别类型
         if (!ext && buffer) {
             if (buffer instanceof TFile) {
                 buffer = await this.app.vault.readBinary(buffer);
+            }
+            if (buffer instanceof File) {
+                buffer = await buffer.arrayBuffer();
             }
             const type = await this.getFileType(buffer);
             ext = (type?.ext ?? '').toLowerCase();

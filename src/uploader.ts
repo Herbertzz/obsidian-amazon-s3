@@ -32,13 +32,16 @@ export class Uploader {
         const links = this.helper.getCurrentLinks();
         for (const link of links) {
             if (link.type === "network") {
-                fileList.push({
-                    path: link.path,
-                    name: link.alt,
-                    source: link.source,
-                    type: 'network',
-                    tfile: null,
-                });
+                const result = await this.downloader.precheckDownload(link.path);
+                if (result.canDownload) {
+                    fileList.push({
+                        path: link.path,
+                        name: link.alt,
+                        source: link.source,
+                        type: 'network',
+                        tfile: null,
+                    });
+                }
                 continue;
             }
 
@@ -63,13 +66,16 @@ export class Uploader {
             }
 
             if (file) {
-                fileList.push({
-                    path: normalizePath(file.path),
-                    name: link.alt,
-                    source: link.source,
-                    type: 'local',
-                    tfile: file,
-                });
+                const path = normalizePath(file.path);
+                if (await this.helper.isAllowFile(path, file)) {
+                    fileList.push({
+                        path: path,
+                        name: link.alt,
+                        source: link.source,
+                        type: 'local',
+                        tfile: file,
+                    });
+                }
             }
         }
 
@@ -140,6 +146,10 @@ export class Uploader {
 
     // 监听文件菜单的上传操作
     async fileMenuUpload(file: TFile) {
+        if (!await this.helper.isAllowFile(file.path, file)) {
+            new Notice("不允许上传此类型的文件！");
+        }
+
         // 上传文件并获取 URL
         const url = await this.upload(file);
         if (!url) {
@@ -291,32 +301,44 @@ export class Uploader {
             return;
         }
 
-        if (!this.canUpload(evt.clipboardData)) {
+        const files = evt.clipboardData.files;
+        const text = evt.clipboardData.getData("text/plain");
+
+        // 过滤出允许上传的文件
+        const filteredFiles: File[] = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files.item(i);
+            if (!file) {
+                continue;
+            }
+            if (await this.helper.isAllowFile(file.name, file)) {
+                filteredFiles.push(file);
+            }
+        }
+
+        // 如果剪贴板中既有图片文件又有文本内容，根据设置决定是否上传
+        if (!this.settings.applyImage && filteredFiles.length > 0 && text) {
             return;
         }
 
         // 拦截默认行为
         evt.preventDefault();
 
-
-        // 获取剪贴板中的文件列表
-        const uploadList: File[] = [];
-        for (let i = 0; i < evt.clipboardData.files.length; i++) {
-            const file = evt.clipboardData.files.item(i);
-            if (file) {
-                uploadList.push(file);
-            }
-        }
+        const uploadList: File[] = [...filteredFiles];
 
         // 剪贴板内容有md格式的图片时
         if (this.settings.workOnNetWork) {
-            const clipboardValue = evt.clipboardData.getData("text/plain");
-            const linkList = this.helper.getLink(clipboardValue)
-                .filter(link => link.type === 'network')
+            const linkList = this.helper.getLink(text).filter(link => link.type === 'network');
 
-            // 下载网络图片到本地
-            if (linkList.length !== 0) {
-                for (const link of linkList) {
+            // 下载预检
+            const canDownloadList = await Promise.all(
+                linkList.map(link => this.downloader.precheckDownload(link.path))
+            );
+            const validLinkList = linkList.filter((_, index) => canDownloadList?.[index]?.canDownload);
+
+            // 下载网络文件到本地
+            if (validLinkList.length !== 0) {
+                for (const link of validLinkList) {
                     const res = await this.downloader.download(link.path);
                     if (!res.success || !res.filePath) {
                         console.error(`Failed to download ${link.path}:`, res.error);
@@ -388,30 +410,16 @@ export class Uploader {
                 continue;
             }
 
+            if (!await this.helper.isAllowFile(file.name, file)) {
+                continue;
+            }
+
             const url = await this.uploadByFile(file);
 
             const id = this.makeID();
             this.insertTemporaryText(editor, id);
             const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
             this.embedMarkdownLink(editor, id, fileType?.ext ?? '', url, file.name);
-        }
-    }
-
-    // 判断剪贴板数据是否包含可上传的图片
-    private canUpload(clipboardData: DataTransfer) {
-        const files = clipboardData.files;
-        const text = clipboardData.getData("text");
-
-        const firstFile = files.item(0);
-        const hasImageFile = !!firstFile && firstFile.type.startsWith("image");
-        if (hasImageFile) {
-            if (!!text) {
-                return this.settings.applyImage;
-            } else {
-                return true;
-            }
-        } else {
-            return false;
         }
     }
 
