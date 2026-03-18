@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
+import { App, Editor, EmbedCache, LinkCache, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
 import { fileTypeFromBuffer } from 'file-type';
 import { FileInfoWithTFile } from "types";
 import { TemplateParser } from "templateParser";
@@ -136,6 +136,66 @@ export class Uploader {
         }
 
         this.replaceImage(fileList, uploadUrlList);
+    }
+
+    // 监听文件菜单的上传操作
+    async fileMenuUpload(file: TFile) {
+        // 上传文件并获取 URL
+        const url = await this.upload(file);
+        if (!url) {
+            new Notice(`上传 ${file.name} 失败！`);
+            return;
+        }
+
+        // 寻找所有引用了该文件的链接（包括普通链接和嵌入图片）
+        const backlinks: { file: TFile, links: (LinkCache | EmbedCache)[] }[] = [];
+        const resolvedLinks = this.app.metadataCache.resolvedLinks;
+        for (const linkPath in resolvedLinks) {
+            if (resolvedLinks?.[linkPath]?.[file.path]) {
+                console.log(`File ${file.path} is linked in ${linkPath}`);
+                const linkFile = this.app.vault.getAbstractFileByPath(linkPath);
+                if (!(linkFile instanceof TFile)) continue;
+                const linkFileCache = this.app.metadataCache.getFileCache(linkFile);
+                if (!(linkFileCache)) continue;
+                console.log(`cache for ${linkPath}:`, linkFileCache);
+
+                // 合并所有的普通链接和嵌入图片
+                const allLinks = [...(linkFileCache.embeds || []), ...(linkFileCache.links || [])];
+                // 过滤出指向当前文件的链接
+                const relevantLinks = allLinks.filter(link => {
+                    const resolvedPath = this.app.metadataCache.getFirstLinkpathDest(link.link, linkPath);
+                    return resolvedPath?.path === file.path;
+                });
+                if (relevantLinks.length > 0) {
+                    backlinks.push({
+                        file: linkFile,
+                        links: relevantLinks,
+                    });
+                }
+            }
+        }
+
+        // 替换所有链接为新的 URL
+        for (const backlink of backlinks) {
+            await this.app.vault.process(backlink.file, content => {
+                let updatedContent = content;
+                backlink.links.forEach(link => {
+                    const originalText = link.original;
+                    const prefix = originalText.startsWith("!") ? "!" : "";
+                    const altText = link.displayText || "";
+                    const newMarkdownLink = `${prefix}[${altText}](${url})`;
+
+                    updatedContent = updatedContent.split(originalText).join(newMarkdownLink);
+                });
+                return updatedContent;
+            })
+        }
+
+        if (this.settings.deleteSource) {
+            await this.app.fileManager.trashFile(file);
+        }
+
+        new Notice(`文件 ${file.name} 已上传并替换 ${backlinks.length} 个链接！`);
     }
 
     private async upload(tfile: TFile): Promise<string> {

@@ -1,4 +1,5 @@
-import { MarkdownView, App } from "obsidian";
+import { fileTypeFromBuffer } from "file-type";
+import { MarkdownView, App, TFile } from "obsidian";
 import { parse } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "settings";
 import { AnyObj } from "types";
@@ -199,6 +200,39 @@ export default class Helper {
 
     // 判断文件是否为图片
     isImage(ext: string) {
+        return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+    }
+
+    // 根据文件内容识别文件类型，返回扩展名和 MIME 类型
+    async getFileType(buffer: ArrayBuffer): Promise<{ ext: string; mime: string } | undefined> {
+        return await fileTypeFromBuffer(buffer)
+    }
+
+    // 判断文件是否允许上传下载
+    async isAllowFile(path: string, buffer?: ArrayBuffer | TFile): Promise<boolean> {
+        let ext = parse(path).ext.slice(1);
+        // 如果没有扩展名且提供了文件数据，则尝试通过文件内容识别类型
+        if (!ext && buffer) {
+            if (buffer instanceof TFile) {
+                buffer = await this.app.vault.readBinary(buffer);
+            }
+            const type = await this.getFileType(buffer);
+            ext = type?.ext ?? '';
+        }
+        // 如果仍然无法识别扩展名，则默认不允许处理
+        if (!ext) {
+            return false;
+        }
+
+        return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+    }
+
+    // 简单通过扩展名判断是否允许上传下载
+    isAllowFileByExt(path: string): boolean {
+        let ext = parse(path).ext.slice(1);
+        if (!ext) {
+            return false;
+        }
 
         return IMAGE_EXT_LIST.includes(ext.toLowerCase());
     }
