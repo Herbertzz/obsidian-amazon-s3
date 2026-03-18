@@ -113,7 +113,7 @@ export class Uploader {
             }
         }
 
-        // 上传图片并获取 URL
+        // 上传文件并获取 URL
         const uploadUrlList: string[] = [];
         for (const file of fileList) {
             if (!file.tfile) {
@@ -130,7 +130,7 @@ export class Uploader {
         }
 
         if (fileList.length !== uploadUrlList.length) {
-            new Notice("警告：图片列表与上传成功的文件数量不一致");
+            new Notice("警告：文件列表与上传成功的文件数量不一致");
             return;
         }
 
@@ -140,7 +140,7 @@ export class Uploader {
             return;
         }
 
-        // 替换上传的图片
+        // 替换上传的文件
         const editorContent = this.helper.getValue();
         if (!editorContent) {
             new Notice("无法获取编辑器内容！");
@@ -227,7 +227,7 @@ export class Uploader {
         new Notice(`文件 ${file.name} 已上传并替换 ${backlinks.length} 个链接！`);
     }
 
-    // 监听剪贴板事件，自动上传图片
+    // 监听剪贴板事件，自动上传文件
     async onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
         const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByClipboardSwitch);
         if (!allowUpload) {
@@ -253,8 +253,8 @@ export class Uploader {
             }
         }
 
-        // 如果剪贴板中既有图片文件又有文本内容，根据设置决定是否上传
-        if (!this.settings.applyImage && filteredFiles.length > 0 && text) {
+        // 如果剪贴板中既有文件又有文本内容，根据设置决定是否上传
+        if (!this.settings.applyFile && filteredFiles.length > 0 && text) {
             return;
         }
 
@@ -263,7 +263,7 @@ export class Uploader {
 
         const uploadList: File[] = [...filteredFiles];
 
-        // 剪贴板内容有md格式的图片时
+        // 剪贴板内容有md格式的文件时
         if (this.settings.workOnNetWork) {
             const linkList = this.helper.getLink(text).filter(link => link.type === 'network');
 
@@ -325,7 +325,7 @@ export class Uploader {
         }
     }
 
-    // 监听拖拽事件，自动上传图片   
+    // 监听拖拽事件，自动上传文件  
     async onDropAutoUpload(evt: DragEvent, editor: Editor) {
         // 如果按住了 Ctrl/Cmd，放行，执行 Obsidian 默认行为（保存到本地）
         if (evt.ctrlKey || evt.metaKey) return;

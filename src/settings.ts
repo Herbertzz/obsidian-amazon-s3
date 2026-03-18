@@ -26,9 +26,9 @@ export interface AmazonS3UploaderPluginSettings {
 	// {fullName}	完整文件名 (含扩展名)
 	// {fileName}	文件名 (不含扩展名)
 	// {extName}	扩展名 (不含 .)
-	// {md5}	图片 MD5
-	// {sha1}	图片 SHA1
-	// {sha256}	图片 SHA256
+	// {md5}	文件 MD5
+	// {sha1}	文件 SHA1
+	// {sha256}	文件 SHA256
 	uploadPathTemplate: string;
 	// 自定义输出 URL 模板，支持以下占位符
 	// {endpoint} 节点
@@ -38,16 +38,16 @@ export interface AmazonS3UploaderPluginSettings {
 	// 强制路径样式
 	forcePathStyle: boolean;
 
-	// 是否应用网络图片
+	// 是否应用网络文件
 	workOnNetWork: boolean
-	// 网络图片域名黑名单，逗号分隔
+	// 网络文件域名黑名单，逗号分隔
 	newWorkBlackDomains: string[];
 	// 是否删除原文件	
 	deleteSource: boolean;
 	// 是否启用剪贴板自动上传
 	uploadByClipboardSwitch: boolean;
-	// 当剪切板中同时拥有文本和图片时, 是否上传图片
-	applyImage: boolean;
+	// 当剪切板中同时拥有文本和文件时, 是否上传文件
+	applyFile: boolean;
 	// 是否启用拖拽自动上传
 	uploadByDropSwitch: boolean;
 	// 文件下载代理
@@ -73,7 +73,7 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	newWorkBlackDomains: [],
 	deleteSource: false,
 	uploadByClipboardSwitch: false,
-	applyImage: true,
+	applyFile: true,
 	uploadByDropSwitch: false,
 	downloadProxy: '',
 	refererRules: [],
@@ -221,8 +221,8 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("应用网络图片")
-			.setDesc("当你上传所有图片时，也会上传网络图片。以及当你进行黏贴时，剪切板中的标准 md 图片会被上传")
+			.setName("应用网络文件")
+			.setDesc("当你上传所有文件时，也会上传网络文件。以及当你进行粘贴时，剪切板中的标准 md 网络文件会被上传")
 			.addToggle(toggle =>
 				toggle
 					.setValue(this.plugin.settings.workOnNetWork)
@@ -234,8 +234,8 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("网络图片域名黑名单")
-			.setDesc("黑名单域名中的图片将不会被上传，用英文逗号分割")
+			.setName("网络文件域名黑名单")
+			.setDesc("黑名单域名中的文件将不会被上传，用英文逗号分割")
 			.addTextArea(textArea =>
 				textArea
 					.setValue(this.plugin.settings.newWorkBlackDomains.join(','))
@@ -275,13 +275,13 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("当剪切板中同时拥有文本和图片时, 是否上传图片")
-			.setDesc("当你复制时，某些应用会在剪切板中同时写入文本和图像数据，确认是否上传。")
+			.setName("当剪切板中同时拥有文本和文件时, 是否上传文件")
+			.setDesc("当你复制时，某些应用会在剪切板中同时写入文本和文件数据，确认是否上传。")
 			.addToggle(toggle =>
 				toggle
-					.setValue(this.plugin.settings.applyImage)
+					.setValue(this.plugin.settings.applyFile)
 					.onChange(async value => {
-						this.plugin.settings.applyImage = value;
+						this.plugin.settings.applyFile = value;
 						this.display();
 						await this.plugin.saveSettings();
 					})
@@ -290,7 +290,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("拖拽自动上传")
 			// eslint-disable-next-line obsidianmd/ui/sentence-case
-			.setDesc("启用该选项后，拖拽图片时会自动上传。如果按住 Ctrl/Cmd，将放行并执行 Obsidian 默认行为（保存到本地）。")
+			.setDesc("启用该选项后，拖拽文件时会自动上传。如果按住 Ctrl/Cmd，将放行并执行 Obsidian 默认行为（保存到本地）。")
 			.addToggle(toggle =>
 				toggle
 					.setValue(this.plugin.settings.uploadByDropSwitch)

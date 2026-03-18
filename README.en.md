@@ -35,13 +35,13 @@ Upload local images, attachments, or remote resources from Obsidian to Amazon S3
 2. Set the upload path template. Default: `{year}/{month}/{fullName}`.
 3. Set the output URL template. Default: `{endpoint}/{bucket}/{path}`.
 4. Run commands from the command palette:
-   - `Upload all images`
-   - `Download all images`
+   - `Upload all files`
+   - `Download all files`
 
 ## Commands
 
-- `Upload all images`: Scan links in the current note and upload supported files.
-- `Download all images`: Download remote resources in the current note and replace them with local links.
+- `Upload all files`: Scan links in the current note and upload supported files.
+- `Download all files`: Download remote resources in the current note and replace them with local links.
 
 ## Context menu
 
@@ -91,11 +91,11 @@ Supported placeholders:
 
 ### Automatic upload and remote resources
 
-- `Apply to network images (workOnNetWork)`: Process remote resources during upload and paste operations.
-- `Network image domain blacklist (newWorkBlackDomains)`: Comma-separated list.
+- `Apply to network files (workOnNetWork)`: Process remote resources during upload and paste operations.
+- `Network file domain blacklist (newWorkBlackDomains)`: Comma-separated list.
 - `Delete source file after upload (deleteSource)`: Remove the local source file after a successful upload.
 - `Auto upload from clipboard (uploadByClipboardSwitch)`
-- `Upload image when both text and image exist in clipboard (applyImage)`
+- `Upload file when both text and file exist in clipboard (applyFile)`
 - `Auto upload on drag and drop (uploadByDropSwitch)`
 
 ### Download settings

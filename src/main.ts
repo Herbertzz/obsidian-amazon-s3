@@ -24,8 +24,8 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 		this.helper = new Helper(this.app, this.settings);
 
 		this.addCommand({
-			id: 'upload-all-images',
-			name: '上传所有图片',
+			id: 'upload-all-files',
+			name: '上传所有文件',
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
@@ -40,8 +40,8 @@ export default class AmazonS3UploaderPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: 'download-all-images',
-			name: '下载所有图片',
+			id: 'download-all-files',
+			name: '下载所有文件',
 			checkCallback: (checking: boolean) => {
 				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {

@@ -63,7 +63,7 @@ export class Downloader {
         this.saveDir = this.app.vault.getConfig("attachmentFolderPath") ?? "/";
     }
 
-    // 下载所有网络图片
+    // 下载所有网络文件
     async downloadAll() {
         const activeFile = this.app.workspace.getActiveFile();
 
@@ -94,7 +94,7 @@ export class Downloader {
         }
 
         // 下载文件并保存
-        new Notice(`共找到 ${networkFiles.length} 个网络图片，正在下载...`);
+        new Notice(`共找到 ${networkFiles.length} 个网络文件，正在下载...`);
         const downloadedFiles: FileData[] = [];
         for (const file of networkFiles) {
             const result = await this.download(file.path);
