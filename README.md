@@ -19,7 +19,7 @@
 
 ### 手动安装
 
-1. 在你的 Vault 中创建目录：`.obsidian/plugins/amazon-s3-uploader/`
+1. 在你的 Vault 中创建目录：`.obsidian/plugins/obsidian-amazon-s3/`
 2. 将 `main.js`、`manifest.json`、`styles.css` 复制到该目录
 3. 重启 Obsidian（或刷新社区插件）
 4. 在 **Settings → Community plugins** 中启用插件

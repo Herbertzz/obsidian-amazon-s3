@@ -19,7 +19,7 @@ Upload local images, attachments, or remote resources from Obsidian to Amazon S3
 
 ### Manual installation
 
-1. Create the folder `.obsidian/plugins/amazon-s3-uploader/` inside your vault.
+1. Create the folder `.obsidian/plugins/obsidian-amazon-s3/` inside your vault.
 2. Copy `main.js`, `manifest.json`, and `styles.css` into that folder.
 3. Restart Obsidian, or reload community plugins.
 4. Enable the plugin in **Settings → Community plugins**.
