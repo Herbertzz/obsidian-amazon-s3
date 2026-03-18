@@ -29,12 +29,12 @@ export class Uploader {
         const filePathMap = this.helper.arrayToObject(this.app.vault.getFiles(), "path");
 
         const fileList: FileInfoWithTFile[] = [];
-        const links = this.helper.getAllFiles();
+        const links = this.helper.getCurrentLinks();
         for (const link of links) {
             if (link.type === "network") {
                 fileList.push({
                     path: link.path,
-                    name: link.name,
+                    name: link.alt,
                     source: link.source,
                     type: 'network',
                     tfile: null,
@@ -65,7 +65,7 @@ export class Uploader {
             if (file) {
                 fileList.push({
                     path: normalizePath(file.path),
-                    name: link.name,
+                    name: link.alt,
                     source: link.source,
                     type: 'local',
                     tfile: file,
@@ -320,14 +320,14 @@ export class Uploader {
                     const res = await this.downloader.download(link.path);
                     if (!res.success || !res.filePath) {
                         console.error(`Failed to download ${link.path}:`, res.error);
-                        new Notice(`下载 ${link.name} 失败！`);
+                        new Notice(`下载 ${link.alt} 失败！`);
                         continue;
                     }
 
                     const tfile = this.app.vault.getAbstractFileByPath(res.filePath);
                     if (!(tfile instanceof TFile)) {
                         console.error(`Downloaded file not found in vault: ${res.filePath}`);
-                        new Notice(`下载 ${link.name} 成功，但未找到文件！`);
+                        new Notice(`下载 ${link.alt} 成功，但未找到文件！`);
                         continue;
                     }
 

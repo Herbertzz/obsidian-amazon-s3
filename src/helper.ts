@@ -6,7 +6,7 @@ import { AnyObj } from "types";
 
 interface Link {
     path: string;
-    name: string;
+    alt: string;
     source: string;
     type: 'network' | 'local';
 }
@@ -67,6 +67,7 @@ export default class Helper {
         return value;
     }
 
+    // 获取当前 Markdown 编辑器实例
     getEditor() {
         const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (mdView) {
@@ -76,6 +77,7 @@ export default class Helper {
         }
     }
 
+    // 获取当前 Markdown 编辑器中的文本内容
     getValue() {
         const editor = this.getEditor();
         return editor?.getValue();
@@ -96,7 +98,7 @@ export default class Helper {
     }
 
     // 获取当前文件中的所有文件链接 (包含本地文件、网络文件、本地图片、网络图片)
-    getAllFiles(): Link[] {
+    getCurrentLinks(): Link[] {
         return this.getLink(this.getValue() ?? "");
     }
 
@@ -110,27 +112,27 @@ export default class Helper {
         for (const match of matches) {
             const source = match[0];
 
-            const name = match[1] ?? match[3] ?? match[5] ?? "";
+            const alt = match[1] ?? match[3] ?? match[5] ?? "";
             const path = match[2] ?? match[4] ?? match[6] ?? "";
 
             fileArray.push({
                 path: path,
-                name: name,
+                alt: alt,
                 source: source,
                 type: path.startsWith("http") ? "network" : "local",
             });
         }
 
         for (const match of WikiMatches) {
-            let name = parse(match[1] ?? '').name;
             const path = match[1] ?? "";
             const source = match[0];
+            let alt = parse(match[1] ?? '').name;
             if (match[2]) {
-                name = `${name}${match[2]}`;
+                alt = `${alt}${match[2]}`;
             }
             fileArray.push({
                 path: path,
-                name: name,
+                alt: alt,
                 source: source,
                 type: path.startsWith("http") ? "network" : "local",
             });

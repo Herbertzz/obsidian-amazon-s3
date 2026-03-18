@@ -4,11 +4,23 @@ import { App, Modal, normalizePath, Notice, Platform, requestUrl } from "obsidia
 import { join, relative } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "settings";
 import { FileData } from "types";
+import * as mime from "mime-types";
 
 interface DownloadResponse {
     success: boolean;
     error?: string;
     data?: ArrayBuffer;
+}
+
+interface DownloadPreCheckResult {
+    canDownload: boolean;
+    reason?: string;
+}
+
+interface HeadPreCheckResult {
+    success: boolean;
+    reason?: string;
+    headers?: Record<string, string>;
 }
 
 interface DownloadResult {
@@ -56,20 +68,24 @@ export class Downloader {
 
         // 筛选出网络文件
         const networkFiles: FileData[] = []
-        const files = this.helper.getAllFiles();
-        // console.log("所有文件：", files);
-        for (const file of files) {
+        const links = this.helper.getCurrentLinks();
+        for (const file of links) {
             if (file.type !== "network") {
+                continue;
+            }
+
+            const result = await this.precheckDownload(file.path);
+            if (!result.canDownload) {
+                console.warn(`跳过下载: ${file.path} ${result.reason}`);
                 continue;
             }
 
             networkFiles.push({
                 path: file.path,
-                name: file.name,
+                name: file.alt,
                 source: file.source,
             });
         }
-        // console.log("网络文件：", networkFiles);
 
         if (networkFiles.length === 0) {
             new Notice("没有需要下载的网络文件");
@@ -99,8 +115,6 @@ export class Downloader {
                 mimeType: result.mimeType,
             });
         }
-        // console.log("下载完成的文件：", downloadedFiles);
-
 
         // 更新文件链接
         const activeFolder = this.app.workspace.getActiveFile()?.parent?.path;
@@ -151,6 +165,133 @@ export class Downloader {
         };
     }
 
+    // 检查响应头, 判断是否可以下载
+    private checkResponseHeader(headers: Record<string, string>): DownloadPreCheckResult {
+        const contentType = headers?.["content-type"] || "";
+
+        if (contentType.includes("text/html")) {
+            return { canDownload: false, reason: "URL 指向的是 HTML 页面" };
+        }
+
+        const ext = mime.extension(contentType) || "";
+        if (!ext) {
+            return { canDownload: false, reason: "无法识别文件类型" };
+        }
+
+        if (!this.helper.isAllowFileByExt(ext)) {
+            return { canDownload: false, reason: `文件类型 ${ext} 不允许下载` };
+        }
+        return { canDownload: true };
+    }
+
+    // 预下载检查，验证 URL 的合法性、是否在黑名单中，以及 HEAD 预检
+    private async precheckDownload(url: string): Promise<DownloadPreCheckResult> {
+        // 检查是否为合法 URL
+        let urlObj: URL;
+        try {
+            urlObj = new URL(url);
+        } catch (error) {
+            return { canDownload: false, reason: "无效的 URL" };
+        }
+
+        // 检查是否在黑名单域名中
+        if (this.helper.hasBlackDomain(url, this.settings.newWorkBlackDomains)) {
+            return { canDownload: false, reason: "该域名在黑名单中，无法下载" };
+        }
+
+        // HEAD 预检
+        const headResult = await this.smartHeadPrecheck(url);
+        if (headResult.success && headResult.headers) {
+            return this.checkResponseHeader(headResult.headers);
+        } else {
+            console.warn(`HEAD 预检失败: ${url} ${headResult.reason}, 将继续尝试下载`);
+        }
+
+        return { canDownload: true };
+    }
+
+    private async smartHeadPrecheck(url: string): Promise<HeadPreCheckResult> {
+        // 桌面端尝试通过 Referer 下载
+        if (Platform.isDesktopApp) {
+            const referer = await this.getReferer(url);
+            if (referer) {
+                return await this.headPrecheckByReferer(url, referer);
+            }
+        }
+
+        // 使用下载代理（如果设置了的话）
+        if (this.settings.downloadProxy) {
+            return await this.headPrecheckByProxy(url, this.settings.downloadProxy.trim());
+        }
+
+        // 其他情况直接下载
+        return await this.headPrecheckByDirectly(url);
+    }
+
+    // 通过用户设置的下载代理进行 HEAD 预检
+    private async headPrecheckByProxy(url: string, proxy: string): Promise<HeadPreCheckResult> {
+        url = proxy.replace(/{url}/g, url);
+        return await this.headPrecheckByDirectly(url);
+    }
+
+    // 通过直接请求进行 HEAD 预检
+    private async headPrecheckByDirectly(url: string): Promise<HeadPreCheckResult> {
+        try {
+            const response = await requestUrl({ url: url, method: "HEAD" });
+            if (response.status !== 200) {
+                return { success: false, reason: `请求失败，状态码: ${response.status}` };
+            }
+
+            return { success: true, headers: response.headers };
+        } catch (error) {
+            return { success: false, reason: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    // 通过 Referer 进行 HEAD 预检
+    private async headPrecheckByReferer(url: string, referer: string): Promise<HeadPreCheckResult> {
+        if (!Platform.isDesktopApp) {
+            return { success: false, reason: "移动端不支持通过 Referer HEAD 请求" };
+        }
+
+        const options = {
+            method: "HEAD",
+            headers: {
+                Accept: "*/*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                Referer: referer,
+            },
+            // rejectUnauthorized: false, // 调试自签名证书时解除注释
+        };
+
+        return new Promise((resolve) => {
+            try {
+                const client = url.startsWith("https") ? require("https") : require("http");
+                client
+                    .request(url, options, (res: any) => {
+                        if (res.statusCode !== 200) {
+                            resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
+                            return;
+                        }
+
+                        resolve({
+                            success: true,
+                            headers: res.headers
+                        });
+                    })
+                    .on("error", (error: Error) => {
+                        resolve({ success: false, reason: error.message });
+                    })
+                    .end();
+            } catch (error) {
+                resolve({
+                    success: false,
+                    reason: error instanceof Error ? error.message : String(error)
+                });
+            }
+        });
+    }
+
     private async smartDownload(url: string): Promise<DownloadResponse> {
         // 桌面端尝试通过 Referer 下载
         if (Platform.isDesktopApp) {
@@ -178,9 +319,14 @@ export class Downloader {
     // 直接下载
     private async downloadDirectly(url: string): Promise<DownloadResponse> {
         try {
-            const response = await requestUrl({url: url, method: "GET"});
+            const response = await requestUrl({ url: url, method: "GET" });
             if (response.status !== 200) {
                 throw new Error(`下载失败，HTTP 状态码: ${response.status}`);
+            }
+
+            const result = this.checkResponseHeader(response.headers);
+            if (!result.canDownload) {
+                throw new Error(`响应头不符合要求: ${result.reason}`);
             }
 
             return { success: true, data: response.arrayBuffer };
@@ -211,6 +357,13 @@ export class Downloader {
                         if (res.statusCode !== 200) {
                             res.resume(); // 消费响应数据以释放内存
                             resolve({ success: false, error: `请求失败，状态码: ${res.statusCode}` });
+                            return;
+                        }
+
+                        const result = this.checkResponseHeader(res.headers);
+                        if (!result.canDownload) {
+                            res.resume();
+                            resolve({ success: false, error: `响应头不符合要求: ${result.reason}` });
                             return;
                         }
 
