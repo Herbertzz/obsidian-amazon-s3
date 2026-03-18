@@ -6,7 +6,7 @@ on:
       - "*"
 
 env:
-  PLUGIN_NAME: amazon-s3-uploader-downloader
+  PLUGIN_NAME: amazon-s3
 
 jobs:
   build:
