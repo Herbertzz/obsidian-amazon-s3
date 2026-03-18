@@ -53,6 +53,10 @@ export interface AmazonS3UploaderPluginSettings {
 	downloadProxy: string;
 	// referer 规则
 	refererRules: string;
+	// 允许上传下载的图片类型列表，逗号分隔
+	allowedImageTypes: string[];
+	// 允许上传下载的文件类型列表，逗号分隔
+	allowedFileTypes: string[];
 }
 
 export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
@@ -72,6 +76,8 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	uploadByDropSwitch: false,
 	downloadProxy: '',
 	refererRules: '',
+	allowedImageTypes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'tiff', 'bmp', 'ico', 'avif', 'heic', 'heif'],
+	allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', '7z', 'gz', 'tar'],
 }
 
 export class AmazonS3UploaderSettingTab extends PluginSettingTab {
@@ -181,6 +187,36 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('高级设置')
 			.setHeading();
+
+		new Setting(containerEl)
+			.setName("允许上传下载的图片扩展名")
+			.setDesc("允许上传下载的图片扩展名，用英文逗号分割。不在此列表中的图片将不会被上传或下载")
+			.addTextArea(textArea =>
+				textArea
+					.setValue(this.plugin.settings.allowedImageTypes.join(','))
+					.onChange(async value => {
+						this.plugin.settings.allowedImageTypes = value
+							.split(',')
+							.map(v => v.trim())
+							.filter(v => v !== '');
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("允许上传下载的文件扩展名")
+			.setDesc("允许上传下载的文件扩展名，用英文逗号分割。不在此列表中的文件将不会被上传或下载")
+			.addTextArea(textArea =>
+				textArea
+					.setValue(this.plugin.settings.allowedFileTypes.join(','))
+					.onChange(async value => {
+						this.plugin.settings.allowedFileTypes = value
+							.split(',')
+							.map(v => v.trim())
+							.filter(v => v !== '');
+						await this.plugin.saveSettings();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("应用网络图片")

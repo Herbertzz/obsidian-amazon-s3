@@ -210,31 +210,46 @@ export default class Helper {
 
     // 判断文件是否允许上传下载
     async isAllowFile(path: string, buffer?: ArrayBuffer | TFile): Promise<boolean> {
-        let ext = parse(path).ext.slice(1);
+        let ext = this.getExtension(path);
         // 如果没有扩展名且提供了文件数据，则尝试通过文件内容识别类型
         if (!ext && buffer) {
             if (buffer instanceof TFile) {
                 buffer = await this.app.vault.readBinary(buffer);
             }
             const type = await this.getFileType(buffer);
-            ext = type?.ext ?? '';
+            ext = (type?.ext ?? '').toLowerCase();
         }
         // 如果仍然无法识别扩展名，则默认不允许处理
         if (!ext) {
             return false;
         }
 
-        return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+        return this.settings.allowedImageTypes.includes(ext) || this.settings.allowedFileTypes.includes(ext);
     }
 
     // 简单通过扩展名判断是否允许上传下载
-    isAllowFileByExt(path: string): boolean {
-        let ext = parse(path).ext.slice(1);
+    isAllowFileByExt(pathOrExt: string): boolean {
+        let ext = this.getExtension(pathOrExt);
         if (!ext) {
             return false;
         }
 
-        return IMAGE_EXT_LIST.includes(ext.toLowerCase());
+        return this.settings.allowedImageTypes.includes(ext) || this.settings.allowedFileTypes.includes(ext);
+    }
+
+    // 从路径中提取扩展名
+    getExtension(pathOrExt: string): string {
+        if (!pathOrExt) return "";
+
+        if (pathOrExt.includes(".")) {
+            return pathOrExt.split('.').pop()?.toLowerCase() || "";
+        }
+
+        if (!pathOrExt.includes("/") && !pathOrExt.includes("\\")) {
+            return pathOrExt.toLowerCase();
+        }
+
+        return "";
     }
 
     // 将数组转换为对象，key 为对象的某个属性值，value 为对象本身
