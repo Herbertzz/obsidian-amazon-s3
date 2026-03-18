@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import AmazonS3UploaderPlugin from "./main";
+import { RefererRule } from "types";
 
 export interface AmazonS3UploaderPluginSettings {
 	// 凭证 ID
@@ -52,7 +53,7 @@ export interface AmazonS3UploaderPluginSettings {
 	// 文件下载代理
 	downloadProxy: string;
 	// referer 规则
-	refererRules: string;
+	refererRules: RefererRule[];
 	// 允许上传下载的图片类型列表，逗号分隔
 	allowedImageTypes: string[];
 	// 允许上传下载的文件类型列表，逗号分隔
@@ -75,7 +76,7 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	applyImage: true,
 	uploadByDropSwitch: false,
 	downloadProxy: '',
-	refererRules: '',
+	refererRules: [],
 	allowedImageTypes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'tiff', 'bmp', 'ico', 'avif', 'heic', 'heif'],
 	allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', '7z', 'gz', 'tar'],
 }
@@ -311,9 +312,19 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			.setDesc("设置 Referer 规则，用于防盗链下载。一行一个规则, 格式为 {domain},{referer}，例如：example.com,https://example.com\nexample.org,https://example.org")
 			.addTextArea(textArea =>
 				textArea
-					.setValue(this.plugin.settings.refererRules)
+					.setValue(
+						this.plugin.settings.refererRules
+							.map(rule => `${rule.domain},${rule.referer}`)
+            				.join("\n")
+					)
 					.onChange(async value => {
-						this.plugin.settings.refererRules = value;
+						this.plugin.settings.refererRules = value
+							.split(/\r?\n/)
+							.map(line => line.trim())
+							.filter(line => line.length > 0 && !line.startsWith("#"))
+							.map(line => line.replace("，", ",").split(",").map(part => part.trim()))
+							.filter((parts): parts is [string, string] => parts.length === 2 && !!parts[0] && !!parts[1])
+							.map(parts => ({ domain: parts[0], referer: parts[1] }));
 						await this.plugin.saveSettings();
 					})
 			);

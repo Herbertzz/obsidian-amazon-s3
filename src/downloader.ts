@@ -404,16 +404,8 @@ export class Downloader {
         const hostname = new URL(url).hostname.toLowerCase();
 
         // 匹配用户自定义的 Referer 规则
-        if (this.settings.refererRules) {
-            const customRules = this.settings.refererRules
-                .split(/\r?\n/)
-                .map(line => line.trim())
-                .filter(line => line.length > 0 && !line.startsWith("#"))
-                .map(line => line.replace("，", ",").split(",").map(part => part.trim()))
-                .filter((parts): parts is [string, string] => parts.length === 2 && !!parts[0] && !!parts[1])
-                .map(parts => ({ domain: parts[0], referer: parts[1] }));
-
-            for (const rule of customRules) {
+        if (this.settings.refererRules.length > 0) {
+            for (const rule of this.settings.refererRules) {
                 if (hostname.endsWith(rule.domain) || hostname.includes(rule.domain)) {
                     return rule.referer;
                 }
