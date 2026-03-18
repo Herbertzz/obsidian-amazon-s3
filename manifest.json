@@ -1,11 +1,11 @@
 {
-	"id": "amazon-s3-uploader-downloader",
+	"id": "amazon-s3",
 	"name": "Amazon S3 Uploader/Downloader",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Amazon S3 上传下载插件",
 	"author": "Herbertzz",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"authorUrl": "https://github.com/Herbertzz",
+	"fundingUrl": "https://github.com/Herbertzz/obsidian-amazon-s3",
 	"isDesktopOnly": false
 }
