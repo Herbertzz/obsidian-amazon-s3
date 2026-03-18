@@ -210,9 +210,11 @@ export default class Helper {
         return await fileTypeFromBuffer(buffer)
     }
 
-    // 判断文件是否允许上传下载
-    async isAllowFile(pathOrExt: string, buffer?: ArrayBuffer | TFile | File): Promise<boolean> {
-        let ext = this.getExtension(pathOrExt);
+    // 通过文件内容判断文件是否允许上传下载
+    async isAllowFile(buffer: ArrayBuffer | TFile | File): Promise<boolean> {
+        const path = buffer instanceof TFile ? buffer.path : buffer instanceof File ? buffer.name : "";
+        let ext = this.getExtension(path);
+
         // 如果没有扩展名且提供了文件数据，则尝试通过文件内容识别类型
         if (!ext && buffer) {
             if (buffer instanceof TFile) {
@@ -224,6 +226,7 @@ export default class Helper {
             const type = await this.getFileType(buffer);
             ext = (type?.ext ?? '').toLowerCase();
         }
+
         // 如果仍然无法识别扩展名，则默认不允许处理
         if (!ext) {
             return false;
@@ -232,7 +235,7 @@ export default class Helper {
         return this.settings.allowedImageTypes.includes(ext) || this.settings.allowedFileTypes.includes(ext);
     }
 
-    // 简单通过扩展名判断是否允许上传下载
+    // 通过扩展名判断是否允许上传下载
     isAllowFileByExt(pathOrExt: string): boolean {
         let ext = this.getExtension(pathOrExt);
         if (!ext) {

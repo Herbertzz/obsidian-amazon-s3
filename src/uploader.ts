@@ -66,10 +66,9 @@ export class Uploader {
             }
 
             if (file) {
-                const path = normalizePath(file.path);
-                if (await this.helper.isAllowFile(path, file)) {
+                if (await this.helper.isAllowFile(file)) {
                     fileList.push({
-                        path: path,
+                        path: normalizePath(file.path),
                         name: link.alt,
                         source: link.source,
                         type: 'local',
@@ -146,7 +145,7 @@ export class Uploader {
 
     // 监听文件菜单的上传操作
     async fileMenuUpload(file: TFile) {
-        if (!await this.helper.isAllowFile(file.path, file)) {
+        if (!await this.helper.isAllowFile(file)) {
             new Notice("不允许上传此类型的文件！");
         }
 
@@ -311,7 +310,7 @@ export class Uploader {
             if (!file) {
                 continue;
             }
-            if (await this.helper.isAllowFile(file.name, file)) {
+            if (await this.helper.isAllowFile(file)) {
                 filteredFiles.push(file);
             }
         }
@@ -410,7 +409,7 @@ export class Uploader {
                 continue;
             }
 
-            if (!await this.helper.isAllowFile(file.name, file)) {
+            if (!await this.helper.isAllowFile(file)) {
                 continue;
             }
 
