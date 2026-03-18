@@ -39,7 +39,7 @@ jobs:
           VERSION: ${{ github.ref }}
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           draft: false
           prerelease: false
           files: |
