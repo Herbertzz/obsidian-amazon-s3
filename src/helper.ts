@@ -147,15 +147,14 @@ export default class Helper {
     }
 
     // 判断链接是否包含黑名单中的域名
-    hasBlackDomain(src: string, blackDomains: string) {
-        if (blackDomains.trim() === "") {
+    hasBlackDomain(src: string, blackDomains: string[]) {
+        if (blackDomains.length === 0) {
             return false;
         }
-        const blackDomainList = blackDomains.split(",").filter(item => item !== "");
         let url = new URL(src);
         const domain = url.hostname;
 
-        return blackDomainList.some(blackDomain => domain.includes(blackDomain));
+        return blackDomains.some(blackDomain => domain.includes(blackDomain));
     }
 
     // 生成 Markdown 链接, 根据文件扩展名判断是图片链接还是普通文件链接

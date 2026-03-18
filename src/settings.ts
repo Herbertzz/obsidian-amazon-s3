@@ -41,7 +41,7 @@ export interface AmazonS3UploaderPluginSettings {
 	// 是否应用网络图片
 	workOnNetWork: boolean
 	// 网络图片域名黑名单，逗号分隔
-	newWorkBlackDomains: string;
+	newWorkBlackDomains: string[];
 	// 是否删除原文件	
 	deleteSource: boolean;
 	// 是否启用剪贴板自动上传
@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: AmazonS3UploaderPluginSettings = {
 	outputURLTemplate: '{endpoint}/{bucket}/{path}',
 	forcePathStyle: false,
 	workOnNetWork: false,
-	newWorkBlackDomains: '',
+	newWorkBlackDomains: [],
 	deleteSource: false,
 	uploadByClipboardSwitch: false,
 	applyImage: true,
@@ -101,7 +101,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('自定义节点')
 			.addText(text => text
-				.setPlaceholder('Endpoint')
+				.setPlaceholder('使用 AWS S3 时可不填，使用第三方兼容 S3 的服务时必填')
 				.setValue(this.plugin.settings.endpoint)
 				.onChange(async (value) => {
 					this.plugin.settings.endpoint = value.trim();
@@ -237,9 +237,12 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 			.setDesc("黑名单域名中的图片将不会被上传，用英文逗号分割")
 			.addTextArea(textArea =>
 				textArea
-					.setValue(this.plugin.settings.newWorkBlackDomains)
+					.setValue(this.plugin.settings.newWorkBlackDomains.join(','))
 					.onChange(async value => {
-						this.plugin.settings.newWorkBlackDomains = value;
+						this.plugin.settings.newWorkBlackDomains = value
+							.split(',')
+							.map(v => v.trim())
+							.filter(v => v !== '');
 						await this.plugin.saveSettings();
 					})
 			);
