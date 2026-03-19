@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "obsidian-amazon-s3",
+	"version": "1.0.4",
+	"description": "Upload or download files to Amazon S3 or third-party S3-compatible services.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
