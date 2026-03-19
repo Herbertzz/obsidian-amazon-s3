@@ -1,7 +1,7 @@
 {
 	"id": "amazon-s3",
 	"name": "Amazon S3 Uploader",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"minAppVersion": "0.15.0",
 	"description": "Upload or download files to Amazon S3 or third-party S3-compatible services.",
 	"author": "Herbertzz",
