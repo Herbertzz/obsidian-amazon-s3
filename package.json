@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-amazon-s3",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"description": "Upload or download files to Amazon S3 or third-party S3-compatible services.",
 	"main": "main.js",
 	"type": "module",

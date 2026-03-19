@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.6](https://github.com/Herbertzz/obsidian-amazon-s3/compare/1.0.5...1.0.6) (2026-03-19)
+
+
+### Bug Fixes
+
+* 修复纯文本无法粘贴的问题 ([0084e34](https://github.com/Herbertzz/obsidian-amazon-s3/commit/0084e345e9b5e305497c3944e9d1e1c7f0af27a1))
+
 ### [1.0.5](https://github.com/Herbertzz/obsidian-amazon-s3/compare/1.0.4...1.0.5) (2026-03-19)
 
 
