@@ -241,6 +241,14 @@ export class Uploader {
         const files = evt.clipboardData.files;
         const text = evt.clipboardData.getData("text/plain");
 
+        if (!files || files.length === 0) {
+            return;
+        }
+        // 如果设置为不上传，则放行，执行 Obsidian 默认行为
+        if (!this.settings.applyFile && text) {
+            return;
+        }
+
         // 过滤出允许上传的文件
         const filteredFiles: File[] = [];
         for (let i = 0; i < files.length; i++) {
@@ -252,9 +260,7 @@ export class Uploader {
                 filteredFiles.push(file);
             }
         }
-
-        // 如果剪贴板中既有文件又有文本内容，根据设置决定是否上传
-        if (!this.settings.applyFile && filteredFiles.length > 0 && text) {
+        if (filteredFiles.length === 0) {
             return;
         }
 
