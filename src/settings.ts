@@ -42,7 +42,7 @@ export interface AmazonS3UploaderPluginSettings {
 	workOnNetWork: boolean
 	// 网络文件域名黑名单，逗号分隔
 	newWorkBlackDomains: string[];
-	// 是否删除原文件	
+	// 是否删除原文件
 	deleteSource: boolean;
 	// 是否启用剪贴板自动上传
 	uploadByClipboardSwitch: boolean;
@@ -318,7 +318,7 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
 					.setValue(
 						this.plugin.settings.refererRules
 							.map(rule => `${rule.domain},${rule.referer}`)
-            				.join("\n")
+							.join("\n")
 					)
 					.onChange(async value => {
 						this.plugin.settings.refererRules = value

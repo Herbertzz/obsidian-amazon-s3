@@ -3,7 +3,7 @@ import Helper from "./helper";
 import { App, Modal, normalizePath, Notice, Platform, requestUrl } from "obsidian";
 import { join, relative } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "./settings";
-import { FileData } from "./types";
+import { FileInfoWithBuffer } from "./types";
 import * as mime from "mime-types";
 
 interface DownloadResponse {
@@ -97,8 +97,8 @@ export class Downloader {
         const activeFile = this.app.workspace.getActiveFile();
 
         // 筛选出网络文件
-        const networkFiles: FileData[] = []
-        const links = this.helper.getCurrentLinks();
+        const networkFiles: FileInfoWithBuffer[] = []
+        const links = this.helper.getActiveFileLinks();
         for (const file of links) {
             if (file.type !== "network") {
                 continue;
@@ -124,7 +124,7 @@ export class Downloader {
 
         // 下载文件并保存
         new Notice(`共找到 ${networkFiles.length} 个网络文件，正在下载...`);
-        const downloadedFiles: FileData[] = [];
+        const downloadedFiles: FileInfoWithBuffer[] = [];
         for (const file of networkFiles) {
             const result = await this.download(file.path);
             if (!result.success) {
@@ -148,7 +148,7 @@ export class Downloader {
 
         // 更新文件链接
         const activeFolder = this.app.workspace.getActiveFile()?.parent?.path;
-        let value = this.helper.getValue() ?? "";
+        let value = this.helper.getActiveViewContent() ?? "";
         for (const file of downloadedFiles) {
             if (file.type === 'local' && activeFolder) {
                 const relativePath = relative(normalizePath(activeFolder), normalizePath(file.path));
@@ -161,7 +161,7 @@ export class Downloader {
             new Notice("当前文件已变更，下载失败");
             return;
         }
-        this.helper.setValue(value);
+        this.helper.setActiveViewContent(value);
 
         new Notice("下载完成");
     }

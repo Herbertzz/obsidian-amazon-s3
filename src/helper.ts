@@ -31,7 +31,7 @@ export default class Helper {
         this.settings = settings;
     }
 
-    // 获取当前文件的 frontmatter 对象
+    // 获取当前激活文件的 frontmatter 对象
     getFrontmatter(): Record<string, unknown> {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) {
@@ -42,7 +42,7 @@ export default class Helper {
         return cache?.frontmatter ?? {};
     }
 
-    // 获取 frontmatter 中指定 key 的值，若不存在则返回默认值
+    // 获取当前激活文件的 frontmatter 中指定 key 的值，若不存在则返回默认值
     getFrontmatterValue<T>(key: string, defaultValue: T | undefined = undefined): T | undefined {
         let value = defaultValue;
         const frontmatter = this.getFrontmatter();
@@ -52,8 +52,8 @@ export default class Helper {
         return value;
     }
 
-    // 获取当前 Markdown 编辑器实例
-    getEditor() {
+    // 获取当前激活的 Markdown 编辑器实例
+    getActiveViewEditor() {
         const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (mdView) {
             return mdView.editor;
@@ -62,14 +62,15 @@ export default class Helper {
         }
     }
 
-    // 获取当前 Markdown 编辑器中的文本内容
-    getValue() {
-        const editor = this.getEditor();
+    // 获取当前激活的 Markdown 编辑器中的文本内容
+    getActiveViewContent() {
+        const editor = this.getActiveViewEditor();
         return editor?.getValue();
     }
 
-    setValue(value: string) {
-        const editor = this.getEditor();
+	// 设置当前激活的 Markdown 编辑器中的文本内容，并尽量保持原有的滚动位置和光标位置
+    setActiveViewContent(value: string) {
+        const editor = this.getActiveViewEditor();
         if (!editor) return;
 
         // 记下原本的滚动条和光标位置
@@ -94,13 +95,13 @@ export default class Helper {
         editor.setCursor(position);
     }
 
-    // 获取当前文件中的所有文件链接 (包含本地文件、网络文件、本地图片、网络图片)
-    getCurrentLinks(): Link[] {
-        return this.getLink(this.getValue() ?? "");
+    // 获取当前激活文件中的所有文件链接 (包含本地文件、网络文件、本地图片、网络图片)
+    getActiveFileLinks(): Link[] {
+        return this.getLinks(this.getActiveViewContent() ?? "");
     }
 
     // 从指定字符串中获取所有链接, 并根据设置过滤掉不需要处理的链接
-    getLink(value: string): Link[] {
+    getLinks(value: string): Link[] {
         const matches = value.matchAll(REGEX_FILE);
         const WikiMatches = value.matchAll(REGEX_WIKI_FILE);
 

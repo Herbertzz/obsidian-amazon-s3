@@ -29,7 +29,7 @@ export class Uploader {
         const filePathMap = this.helper.arrayToObject(this.app.vault.getFiles(), "path");
 
         const fileList: FileInfoWithTFile[] = [];
-        const links = this.helper.getCurrentLinks();
+        const links = this.helper.getActiveFileLinks();
         for (const link of links) {
             if (link.type === "network") {
                 const result = await this.downloader.precheckDownload(link.path);
@@ -141,7 +141,7 @@ export class Uploader {
         }
 
         // 替换上传的文件
-        const editorContent = this.helper.getValue();
+        const editorContent = this.helper.getActiveViewContent();
         if (!editorContent) {
             new Notice("无法获取编辑器内容！");
             return;
@@ -153,7 +153,7 @@ export class Uploader {
             content = content.split(item.source).join(`![${item.name}](${uploadImage})`);
         });
 
-        this.helper.setValue(content);
+        this.helper.setActiveViewContent(content);
 
         // 删除本地原文件
         if (this.settings.deleteSource) {
@@ -271,7 +271,7 @@ export class Uploader {
 
         // 剪贴板内容有md格式的文件时
         if (this.settings.workOnNetWork) {
-            const linkList = this.helper.getLink(text).filter(link => link.type === 'network');
+            const linkList = this.helper.getLinks(text).filter(link => link.type === 'network');
 
             // 下载预检
             const canDownloadList = await Promise.all(
