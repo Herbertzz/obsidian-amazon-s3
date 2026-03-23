@@ -81,14 +81,6 @@ export class TemplateParser {
         setting: { endpoint: string; bucket: string; region: string },
         path: string,
     ): string {
-        let endpoint = setting.endpoint;
-        if (endpoint === "") {
-            endpoint = `https://${setting.bucket}.s3.${setting.region}.amazonaws.com`;
-        }
-        if (endpoint.endsWith("/")) {
-            endpoint = endpoint.slice(0, -1);
-        }
-
         let result = template;
         result = result.replace(/{endpoint}/g, setting.endpoint);
         result = result.replace(/{bucket}/g, setting.bucket);

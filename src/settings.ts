@@ -255,9 +255,9 @@ export class AmazonS3UploaderSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName("应用网络文件")
+            .setName("应用网络图片或文件")
             .setDesc(
-                "当你上传所有文件时，也会上传网络文件。以及当你进行粘贴时，剪切板中的标准 md 网络文件会被上传",
+                "当你上传时，也会上传网络图片或文件。以及当你进行粘贴时，剪切板中的标准 md 网络图片或文件链接会被上传。会排除掉黑名单中的域名以及 endpoint 域名。",
             )
             .addToggle((toggle) =>
                 toggle

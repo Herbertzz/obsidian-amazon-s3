@@ -167,14 +167,26 @@ export default class Helper {
     }
 
     // 判断链接是否包含黑名单中的域名
-    hasBlackDomain(src: string, blackDomains: string[]) {
-        if (blackDomains.length === 0) {
-            return false;
-        }
-        let url = new URL(src);
-        const domain = url.hostname;
+    hasBlackDomain(src: string, blackDomains: string[] = []): boolean {
+        // 将插件的 Endpoint 域名加入黑名单列表，避免误处理上传后的链接
+        const endpoint = this.makeEndpoint();
+        const endpointUrl = new URL(endpoint);
+        blackDomains.push(endpointUrl.hostname);
 
-        return blackDomains.some(blackDomain => domain.includes(blackDomain));
+        // 从链接中提取域名进行匹配
+        const srcUrl = new URL(src);
+        const domain = srcUrl.hostname;
+
+        return blackDomains.some((blackDomain) => domain.includes(blackDomain));
+    }
+
+    // 生成 Endpoint
+    makeEndpoint() {
+        let endpoint = this.settings.endpoint;
+        if (endpoint === "") {
+            endpoint = `https://${this.settings.bucket}.s3.${this.settings.region}.amazonaws.com`;
+        }
+        return endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
     }
 
     // 生成 Markdown 链接, 根据文件扩展名判断是图片链接还是普通文件链接

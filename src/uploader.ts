@@ -502,7 +502,7 @@ export class Uploader {
         return TemplateParser.outputURL(
             this.settings.outputURLTemplate,
             {
-                endpoint: this.settings.endpoint,
+                endpoint: this.helper.makeEndpoint(),
                 bucket: this.settings.bucket,
                 region: this.settings.region,
             },
