@@ -7,7 +7,7 @@ interface Link {
     path: string;
     alt: string;
     source: string;
-    type: 'network' | 'local';
+    type: "network" | "local";
 }
 
 // REGEX_FILE 可匹配以下格式（图片用 ![]() 前缀，普通文件用 []() 前缀）：
@@ -15,12 +15,12 @@ interface Link {
 //   ![alt](./path/image.png)      标准 Markdown 图片/文件链接（路径中需含扩展名）
 //   ![alt](image.png "title")     带可选标题的本地链接
 //   ![alt](https://example.com/x) 网络链接（http/https，无需扩展名）
-const REGEX_FILE = /!?\[(.*?)\]\(<(\S+\.\w+)>\)|!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
+const REGEX_FILE =
+    /!?\[(.*?)\]\(<(\S+\.\w+)>\)|!?\[(.*?)\]\((\S+\.\w+)(?:\s+"[^"]*")?\)|!?\[(.*?)\]\((https?:\/\/.*?)\)/g;
 // REGEX_WIKI_FILE 可匹配以下格式：
 //   ![[image.png]]          Wiki 风格图片嵌入
 //   ![[image.png|alias]]    带别名的 Wiki 风格图片嵌入
 const REGEX_WIKI_FILE = /!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
-
 
 export default class Helper {
     private app: App;
@@ -43,7 +43,10 @@ export default class Helper {
     }
 
     // 获取当前激活文件的 frontmatter 中指定 key 的值，若不存在则返回默认值
-    getFrontmatterValue<T>(key: string, defaultValue: T | undefined = undefined): T | undefined {
+    getFrontmatterValue<T>(
+        key: string,
+        defaultValue: T | undefined = undefined,
+    ): T | undefined {
         let value = defaultValue;
         const frontmatter = this.getFrontmatter();
         if (key in frontmatter) {
@@ -68,7 +71,7 @@ export default class Helper {
         return editor?.getValue();
     }
 
-	// 设置当前激活的 Markdown 编辑器中的文本内容，并尽量保持原有的滚动位置和光标位置
+    // 设置当前激活的 Markdown 编辑器中的文本内容，并尽量保持原有的滚动位置和光标位置
     setActiveViewContent(value: string) {
         const editor = this.getActiveViewEditor();
         if (!editor) return;
@@ -124,7 +127,7 @@ export default class Helper {
         for (const match of WikiMatches) {
             const path = match[1] ?? "";
             const source = match[0];
-            let alt = parse(match[1] ?? '').name;
+            let alt = parse(match[1] ?? "").name;
             if (match[2]) {
                 alt = `${alt}${match[2]}`;
             }
@@ -144,9 +147,14 @@ export default class Helper {
         const filteredLinks: Link[] = [];
 
         for (const match of links) {
-            if (match.type === 'network') {
+            if (match.type === "network") {
                 if (this.settings.workOnNetWork) {
-                    if (!this.hasBlackDomain(match.path, this.settings.newWorkBlackDomains)) {
+                    if (
+                        !this.hasBlackDomain(
+                            match.path,
+                            this.settings.newWorkBlackDomains,
+                        )
+                    ) {
                         filteredLinks.push(match);
                     }
                 }
@@ -170,7 +178,11 @@ export default class Helper {
     }
 
     // 生成 Markdown 链接, 根据文件扩展名判断是图片链接还是普通文件链接
-    makeLink(path: string, description: string = '', realExtension?: string): string {
+    makeLink(
+        path: string,
+        description: string = "",
+        realExtension?: string,
+    ): string {
         if (realExtension) {
             if (this.isImage(realExtension)) {
                 return this.makeImageLink(path, description);
@@ -187,15 +199,14 @@ export default class Helper {
     }
 
     // 生成 Markdown 文件链接
-    makeFileLink(path: string, description: string = ''): string {
-        return `[${description}](${encodeURI(path)})`
+    makeFileLink(path: string, description: string = ""): string {
+        return `[${description}](${encodeURI(path)})`;
     }
 
     // 生成 Markdown 图片链接
     makeImageLink(path: string, description: string = ""): string {
-        return `![${description}](${encodeURI(path)})`
+        return `![${description}](${encodeURI(path)})`;
     }
-
 
     // 判断文件是否为图片
     isImage(ext: string) {
@@ -203,13 +214,20 @@ export default class Helper {
     }
 
     // 根据文件内容识别文件类型，返回扩展名和 MIME 类型
-    async getFileType(buffer: ArrayBuffer): Promise<{ ext: string; mime: string } | undefined> {
-        return await fileTypeFromBuffer(buffer)
+    async getFileType(
+        buffer: ArrayBuffer,
+    ): Promise<{ ext: string; mime: string } | undefined> {
+        return await fileTypeFromBuffer(buffer);
     }
 
     // 通过文件内容判断文件是否允许上传下载
     async isAllowFile(buffer: ArrayBuffer | TFile | File): Promise<boolean> {
-        const path = buffer instanceof TFile ? buffer.path : buffer instanceof File ? buffer.name : "";
+        const path =
+            buffer instanceof TFile
+                ? buffer.path
+                : buffer instanceof File
+                  ? buffer.name
+                  : "";
         let ext = this.getExtension(path);
 
         // 如果没有扩展名且提供了文件数据，则尝试通过文件内容识别类型
@@ -221,7 +239,7 @@ export default class Helper {
                 buffer = await buffer.arrayBuffer();
             }
             const type = await this.getFileType(buffer);
-            ext = (type?.ext ?? '').toLowerCase();
+            ext = (type?.ext ?? "").toLowerCase();
         }
 
         // 如果仍然无法识别扩展名，则默认不允许处理
@@ -229,7 +247,10 @@ export default class Helper {
             return false;
         }
 
-        return this.settings.allowedImageTypes.includes(ext) || this.settings.allowedFileTypes.includes(ext);
+        return (
+            this.settings.allowedImageTypes.includes(ext) ||
+            this.settings.allowedFileTypes.includes(ext)
+        );
     }
 
     // 通过扩展名判断是否允许上传下载
@@ -239,7 +260,10 @@ export default class Helper {
             return false;
         }
 
-        return this.settings.allowedImageTypes.includes(ext) || this.settings.allowedFileTypes.includes(ext);
+        return (
+            this.settings.allowedImageTypes.includes(ext) ||
+            this.settings.allowedFileTypes.includes(ext)
+        );
     }
 
     // 从路径中提取扩展名
@@ -247,7 +271,7 @@ export default class Helper {
         if (!pathOrExt) return "";
 
         if (pathOrExt.includes(".")) {
-            return pathOrExt.split('.').pop()?.toLowerCase() || "";
+            return pathOrExt.split(".").pop()?.toLowerCase() || "";
         }
 
         if (!pathOrExt.includes("/") && !pathOrExt.includes("\\")) {

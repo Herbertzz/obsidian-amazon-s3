@@ -7,7 +7,7 @@ on:
         branches: ["**"]
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
     build:
@@ -28,4 +28,3 @@ jobs:
             - run: npm ci
             - run: npm run build --if-present
             - run: npm run lint
-

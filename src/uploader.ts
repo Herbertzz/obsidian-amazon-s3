@@ -1,5 +1,14 @@
-import { App, Editor, EmbedCache, LinkCache, MarkdownView, normalizePath, Notice, TFile } from "obsidian";
-import { fileTypeFromBuffer } from 'file-type';
+import {
+    App,
+    Editor,
+    EmbedCache,
+    LinkCache,
+    MarkdownView,
+    normalizePath,
+    Notice,
+    TFile,
+} from "obsidian";
+import { fileTypeFromBuffer } from "file-type";
 import { FileInfoWithTFile } from "types";
 import { TemplateParser } from "./templateParser";
 import { PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
@@ -7,7 +16,6 @@ import Helper from "./helper";
 import { AmazonS3UploaderPluginSettings } from "./settings";
 import { basename, dirname, resolve } from "path-browserify";
 import { Downloader } from "./downloader";
-
 
 export class Uploader {
     private app: App;
@@ -25,20 +33,28 @@ export class Uploader {
     // 上传所有文件
     async uploadAll() {
         const activeFile = this.app.workspace.getActiveFile();
-        const fileMap = this.helper.arrayToObject(this.app.vault.getFiles(), "name");
-        const filePathMap = this.helper.arrayToObject(this.app.vault.getFiles(), "path");
+        const fileMap = this.helper.arrayToObject(
+            this.app.vault.getFiles(),
+            "name",
+        );
+        const filePathMap = this.helper.arrayToObject(
+            this.app.vault.getFiles(),
+            "path",
+        );
 
         const fileList: FileInfoWithTFile[] = [];
         const links = this.helper.getActiveFileLinks();
         for (const link of links) {
             if (link.type === "network") {
-                const result = await this.downloader.precheckDownload(link.path);
+                const result = await this.downloader.precheckDownload(
+                    link.path,
+                );
                 if (result.canDownload) {
                     fileList.push({
                         path: link.path,
                         name: link.alt,
                         source: link.source,
-                        type: 'network',
+                        type: "network",
                         tfile: null,
                     });
                 }
@@ -56,7 +72,9 @@ export class Uploader {
 
             // 相对路径
             if ((!file && path.startsWith("./")) || path.startsWith("../")) {
-                const filePath = normalizePath(resolve(dirname(activeFile?.path || ""), path));
+                const filePath = normalizePath(
+                    resolve(dirname(activeFile?.path || ""), path),
+                );
                 file = filePathMap[filePath];
             }
 
@@ -71,7 +89,7 @@ export class Uploader {
                         path: normalizePath(file.path),
                         name: link.alt,
                         source: link.source,
-                        type: 'local',
+                        type: "local",
                         tfile: file,
                     });
                 }
@@ -93,21 +111,28 @@ export class Uploader {
                     continue;
                 }
 
-                const downloadResult = await this.downloader.download(item.path);
+                const downloadResult = await this.downloader.download(
+                    item.path,
+                );
                 if (!downloadResult.success) {
-                    console.error(`Failed to download ${item.path}:`, downloadResult.error);
+                    console.error(
+                        `Failed to download ${item.path}:`,
+                        downloadResult.error,
+                    );
                     new Notice(`下载 ${item.name} 失败！`);
                     continue;
                 }
 
-                item.path = downloadResult.filePath ?? '';
-                item.type = 'local';
+                item.path = downloadResult.filePath ?? "";
+                item.type = "local";
 
                 const tfile = this.app.vault.getAbstractFileByPath(item.path);
                 if (tfile instanceof TFile) {
                     item.tfile = tfile;
                 } else {
-                    console.error(`Downloaded file not found in vault: ${item.path}`);
+                    console.error(
+                        `Downloaded file not found in vault: ${item.path}`,
+                    );
                     new Notice(`下载 ${item.name} 成功，但未找到文件！`);
                 }
             }
@@ -148,17 +173,19 @@ export class Uploader {
         }
 
         let content: string = editorContent;
-        fileList.map(item => {
+        fileList.map((item) => {
             const uploadImage = uploadUrlList.shift();
-            content = content.split(item.source).join(`![${item.name}](${uploadImage})`);
+            content = content
+                .split(item.source)
+                .join(`![${item.name}](${uploadImage})`);
         });
 
         this.helper.setActiveViewContent(content);
 
         // 删除本地原文件
         if (this.settings.deleteSource) {
-            fileList.map(file => {
-                if (file.tfile && file.type === 'local') {
+            fileList.map((file) => {
+                if (file.tfile && file.type === "local") {
                     void this.app.fileManager.trashFile(file.tfile);
                 }
             });
@@ -167,7 +194,7 @@ export class Uploader {
 
     // 监听文件菜单的上传操作
     async fileMenuUpload(file: TFile) {
-        if (!await this.helper.isAllowFile(file)) {
+        if (!(await this.helper.isAllowFile(file))) {
             new Notice("不允许上传此类型的文件！");
         }
 
@@ -179,20 +206,29 @@ export class Uploader {
         }
 
         // 寻找所有引用了该文件的链接（包括普通链接和嵌入图片）
-        const backlinks: { file: TFile, links: (LinkCache | EmbedCache)[] }[] = [];
+        const backlinks: { file: TFile; links: (LinkCache | EmbedCache)[] }[] =
+            [];
         const resolvedLinks = this.app.metadataCache.resolvedLinks;
         for (const linkPath in resolvedLinks) {
             if (resolvedLinks?.[linkPath]?.[file.path]) {
                 const linkFile = this.app.vault.getAbstractFileByPath(linkPath);
                 if (!(linkFile instanceof TFile)) continue;
-                const linkFileCache = this.app.metadataCache.getFileCache(linkFile);
-                if (!(linkFileCache)) continue;
+                const linkFileCache =
+                    this.app.metadataCache.getFileCache(linkFile);
+                if (!linkFileCache) continue;
 
                 // 合并所有的普通链接和嵌入图片
-                const allLinks = [...(linkFileCache.embeds || []), ...(linkFileCache.links || [])];
+                const allLinks = [
+                    ...(linkFileCache.embeds || []),
+                    ...(linkFileCache.links || []),
+                ];
                 // 过滤出指向当前文件的链接
-                const relevantLinks = allLinks.filter(link => {
-                    const resolvedPath = this.app.metadataCache.getFirstLinkpathDest(link.link, linkPath);
+                const relevantLinks = allLinks.filter((link) => {
+                    const resolvedPath =
+                        this.app.metadataCache.getFirstLinkpathDest(
+                            link.link,
+                            linkPath,
+                        );
                     return resolvedPath?.path === file.path;
                 });
                 if (relevantLinks.length > 0) {
@@ -206,30 +242,41 @@ export class Uploader {
 
         // 替换所有链接为新的 URL
         for (const backlink of backlinks) {
-            await this.app.vault.process(backlink.file, content => {
+            await this.app.vault.process(backlink.file, (content) => {
                 let updatedContent = content;
-                backlink.links.forEach(link => {
+                backlink.links.forEach((link) => {
                     const originalText = link.original;
                     const prefix = originalText.startsWith("!") ? "!" : "";
                     const altText = link.displayText || "";
                     const newMarkdownLink = `${prefix}[${altText}](${url})`;
 
-                    updatedContent = updatedContent.split(originalText).join(newMarkdownLink);
+                    updatedContent = updatedContent
+                        .split(originalText)
+                        .join(newMarkdownLink);
                 });
                 return updatedContent;
-            })
+            });
         }
 
         if (this.settings.deleteSource) {
             await this.app.fileManager.trashFile(file);
         }
 
-        new Notice(`文件 ${file.name} 已上传并替换 ${backlinks.length} 个链接！`);
+        new Notice(
+            `文件 ${file.name} 已上传并替换 ${backlinks.length} 个链接！`,
+        );
     }
 
     // 监听剪贴板事件，自动上传文件
-    async onClipboardAutoUpload(evt: ClipboardEvent, editor: Editor, markdownView: MarkdownView) {
-        const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByClipboardSwitch);
+    async onClipboardAutoUpload(
+        evt: ClipboardEvent,
+        editor: Editor,
+        markdownView: MarkdownView,
+    ) {
+        const allowUpload = this.helper.getFrontmatterValue(
+            "image-auto-upload",
+            this.settings.uploadByClipboardSwitch,
+        );
         if (!allowUpload) {
             return;
         }
@@ -271,27 +318,40 @@ export class Uploader {
 
         // 剪贴板内容有md格式的文件时
         if (this.settings.workOnNetWork) {
-            const linkList = this.helper.getLinks(text).filter(link => link.type === 'network');
+            const linkList = this.helper
+                .getLinks(text)
+                .filter((link) => link.type === "network");
 
             // 下载预检
             const canDownloadList = await Promise.all(
-                linkList.map(link => this.downloader.precheckDownload(link.path))
+                linkList.map((link) =>
+                    this.downloader.precheckDownload(link.path),
+                ),
             );
-            const validLinkList = linkList.filter((_, index) => canDownloadList?.[index]?.canDownload);
+            const validLinkList = linkList.filter(
+                (_, index) => canDownloadList?.[index]?.canDownload,
+            );
 
             // 下载网络文件到本地
             if (validLinkList.length !== 0) {
                 for (const link of validLinkList) {
                     const res = await this.downloader.download(link.path);
                     if (!res.success || !res.filePath) {
-                        console.error(`Failed to download ${link.path}:`, res.error);
+                        console.error(
+                            `Failed to download ${link.path}:`,
+                            res.error,
+                        );
                         new Notice(`下载 ${link.alt} 失败！`);
                         continue;
                     }
 
-                    const tfile = this.app.vault.getAbstractFileByPath(res.filePath);
+                    const tfile = this.app.vault.getAbstractFileByPath(
+                        res.filePath,
+                    );
                     if (!(tfile instanceof TFile)) {
-                        console.error(`Downloaded file not found in vault: ${res.filePath}`);
+                        console.error(
+                            `Downloaded file not found in vault: ${res.filePath}`,
+                        );
                         new Notice(`下载 ${link.alt} 成功，但未找到文件！`);
                         continue;
                     }
@@ -319,10 +379,18 @@ export class Uploader {
             try {
                 const url = await this.upload(file);
                 if (url) {
-                    const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
-                    this.embedMarkdownLink(editor, pasteId, fileType?.ext ?? '', url, file.name);
+                    const fileType = await fileTypeFromBuffer(
+                        await file.arrayBuffer(),
+                    );
+                    this.embedMarkdownLink(
+                        editor,
+                        pasteId,
+                        fileType?.ext ?? "",
+                        url,
+                        file.name,
+                    );
                 } else {
-                    this.handleFailedUpload(editor, pasteId, "文件不存在")
+                    this.handleFailedUpload(editor, pasteId, "文件不存在");
                 }
             } catch (e) {
                 const reason = e instanceof Error ? e.message : String(e);
@@ -331,12 +399,15 @@ export class Uploader {
         }
     }
 
-    // 监听拖拽事件，自动上传文件  
+    // 监听拖拽事件，自动上传文件
     async onDropAutoUpload(evt: DragEvent, editor: Editor) {
         // 如果按住了 Ctrl/Cmd，放行，执行 Obsidian 默认行为（保存到本地）
         if (evt.ctrlKey || evt.metaKey) return;
 
-        const allowUpload = this.helper.getFrontmatterValue("image-auto-upload", this.settings.uploadByDropSwitch);
+        const allowUpload = this.helper.getFrontmatterValue(
+            "image-auto-upload",
+            this.settings.uploadByDropSwitch,
+        );
         if (!allowUpload) {
             return;
         }
@@ -353,7 +424,7 @@ export class Uploader {
                 continue;
             }
 
-            if (!await this.helper.isAllowFile(file)) {
+            if (!(await this.helper.isAllowFile(file))) {
                 continue;
             }
 
@@ -362,12 +433,21 @@ export class Uploader {
             const id = this.makeID();
             this.insertTemporaryText(editor, id);
             const fileType = await fileTypeFromBuffer(await file.arrayBuffer());
-            this.embedMarkdownLink(editor, id, fileType?.ext ?? '', url, file.name);
+            this.embedMarkdownLink(
+                editor,
+                id,
+                fileType?.ext ?? "",
+                url,
+                file.name,
+            );
         }
     }
 
     // 核心上传函数，支持 TFile、File 和 ArrayBuffer 三种输入
-    private async upload(file: TFile | File | ArrayBuffer, filename?: string): Promise<string> {
+    private async upload(
+        file: TFile | File | ArrayBuffer,
+        filename?: string,
+    ): Promise<string> {
         let buffer: ArrayBuffer;
         if (file instanceof TFile) {
             buffer = await this.app.vault.readBinary(file);
@@ -386,8 +466,8 @@ export class Uploader {
         const uploadPath = await TemplateParser.uploadPath(
             this.settings.uploadPathTemplate,
             filename,
-            fileType?.ext ?? '',
-            buffer
+            fileType?.ext ?? "",
+            buffer,
         );
 
         // 初始化 S3 客户端
@@ -409,18 +489,25 @@ export class Uploader {
             Bucket: this.settings.bucket,
             Key: uploadPath,
             Body: new Uint8Array(buffer),
-            ContentType: fileType?.mime ?? 'application/octet-stream',
+            ContentType: fileType?.mime ?? "application/octet-stream",
             // ACL: 'public-read', // 如果你的 Bucket 策略要求显式声明公共读权限，可以取消注释
         });
         await client.send(command);
 
         // 构建返回的 URL
-        const uploadedPath = uploadPath.split('/').map((part: string) => encodeURIComponent(part)).join('/');
-        return TemplateParser.outputURL(this.settings.outputURLTemplate, {
-            endpoint: this.settings.endpoint,
-            bucket: this.settings.bucket,
-            region: this.settings.region,
-        }, uploadedPath);
+        const uploadedPath = uploadPath
+            .split("/")
+            .map((part: string) => encodeURIComponent(part))
+            .join("/");
+        return TemplateParser.outputURL(
+            this.settings.outputURLTemplate,
+            {
+                endpoint: this.settings.endpoint,
+                bucket: this.settings.bucket,
+                region: this.settings.region,
+            },
+            uploadedPath,
+        );
     }
 
     // 生成一个随机 ID，用于临时占位符
@@ -435,7 +522,13 @@ export class Uploader {
     }
 
     // 将 Markdown 链接嵌入编辑器，替换之前的占位符文本
-    private embedMarkdownLink(editor: Editor, id: string, ext: string, path: string, name: string = "") {
+    private embedMarkdownLink(
+        editor: Editor,
+        id: string,
+        ext: string,
+        path: string,
+        name: string = "",
+    ) {
         const progressText = this.progressTextFor(id);
         const link = this.helper.makeLink(path, name, ext);
         this.replaceFirstOccurrence(editor, progressText, link);
@@ -446,7 +539,11 @@ export class Uploader {
         new Notice(reason);
         console.error("Failed request: ", reason);
         const progressText = this.progressTextFor(id);
-        this.replaceFirstOccurrence(editor, progressText, "⚠️upload failed, check dev console");
+        this.replaceFirstOccurrence(
+            editor,
+            progressText,
+            "⚠️upload failed, check dev console",
+        );
     }
 
     // 生成临时占位符文本
@@ -455,7 +552,11 @@ export class Uploader {
     }
 
     // 替换编辑器中第一次出现的目标文本为替换文本
-    private replaceFirstOccurrence(editor: Editor, target: string, replacement: string) {
+    private replaceFirstOccurrence(
+        editor: Editor,
+        target: string,
+        replacement: string,
+    ) {
         let lines = editor.getValue().split("\n");
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i] ?? "";

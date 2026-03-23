@@ -1,6 +1,13 @@
 import { fileTypeFromBuffer } from "file-type";
 import Helper from "./helper";
-import { App, Modal, normalizePath, Notice, Platform, requestUrl } from "obsidian";
+import {
+    App,
+    Modal,
+    normalizePath,
+    Notice,
+    Platform,
+    requestUrl,
+} from "obsidian";
 import { join, relative } from "path-browserify";
 import { AmazonS3UploaderPluginSettings } from "./settings";
 import { FileInfoWithBuffer } from "./types";
@@ -46,8 +53,16 @@ interface NodeRequest {
 }
 
 interface NodeTransport {
-    request(url: string, options: Record<string, unknown>, callback: (res: NodeResponse) => void): NodeRequest;
-    get(url: string, options: Record<string, unknown>, callback: (res: NodeResponse) => void): NodeRequest;
+    request(
+        url: string,
+        options: Record<string, unknown>,
+        callback: (res: NodeResponse) => void,
+    ): NodeRequest;
+    get(
+        url: string,
+        options: Record<string, unknown>,
+        callback: (res: NodeResponse) => void,
+    ): NodeRequest;
 }
 
 // 定义防盗链匹配规则字典
@@ -62,11 +77,13 @@ const REFERER_RULES = [
     { domain: "juejin.cn", referer: "https://juejin.cn" },
     { domain: "byteimg.com", referer: "https://juejin.cn" },
     { domain: "mmbiz.qpic.cn", referer: "https://mp.weixin.qq.com/" },
-    { domain: "qpic.cn", referer: "https://mp.weixin.qq.com/" }
+    { domain: "qpic.cn", referer: "https://mp.weixin.qq.com/" },
 ];
 
 function nodeRequestClient(url: string) {
-    const globalRequire = (window as unknown as { require?: (id: string) => unknown }).require;
+    const globalRequire = (
+        window as unknown as { require?: (id: string) => unknown }
+    ).require;
     if (!globalRequire) {
         throw new Error("无法获取 require 函数，无法进行 Node 请求");
     }
@@ -88,7 +105,9 @@ export class Downloader {
         this.helper = new Helper(app, settings);
 
         // 由于 getConfig 是未文档化的内部 API，官方的 .d.ts 类型定义里没有它.
-        const internalVault = this.app.vault as unknown as { getConfig: (key: string) => string | undefined };
+        const internalVault = this.app.vault as unknown as {
+            getConfig: (key: string) => string | undefined;
+        };
         this.saveDir = internalVault.getConfig("attachmentFolderPath") ?? "/";
     }
 
@@ -97,7 +116,7 @@ export class Downloader {
         const activeFile = this.app.workspace.getActiveFile();
 
         // 筛选出网络文件
-        const networkFiles: FileInfoWithBuffer[] = []
+        const networkFiles: FileInfoWithBuffer[] = [];
         const links = this.helper.getActiveFileLinks();
         for (const file of links) {
             if (file.type !== "network") {
@@ -140,7 +159,7 @@ export class Downloader {
                 path: result.filePath,
                 name: file.name,
                 source: file.source,
-                type: 'local',
+                type: "local",
                 realExtension: result.realExtension,
                 mimeType: result.mimeType,
             });
@@ -150,9 +169,16 @@ export class Downloader {
         const activeFolder = this.app.workspace.getActiveFile()?.parent?.path;
         let value = this.helper.getActiveViewContent() ?? "";
         for (const file of downloadedFiles) {
-            if (file.type === 'local' && activeFolder) {
-                const relativePath = relative(normalizePath(activeFolder), normalizePath(file.path));
-                const link = this.helper.makeLink(relativePath, file.name, file.realExtension);
+            if (file.type === "local" && activeFolder) {
+                const relativePath = relative(
+                    normalizePath(activeFolder),
+                    normalizePath(file.path),
+                );
+                const link = this.helper.makeLink(
+                    relativePath,
+                    file.name,
+                    file.realExtension,
+                );
                 value = value.replace(file.source, link);
             }
         }
@@ -185,7 +211,8 @@ export class Downloader {
         // 从 URL 中提取文件名，处理 URL 编码，并替换掉不合法的文件名字符
         const urlObj = new URL(url);
         const pathname = decodeURI(urlObj.pathname);
-        const name = pathname.substring(pathname.lastIndexOf("/") + 1)
+        const name = pathname
+            .substring(pathname.lastIndexOf("/") + 1)
             .replace(/[\\\\/:*?"<>|]/g, "-");
 
         const savePath = normalizePath(join(this.saveDir, name));
@@ -210,7 +237,9 @@ export class Downloader {
         }
 
         // 检查是否在黑名单域名中
-        if (this.helper.hasBlackDomain(url, this.settings.newWorkBlackDomains)) {
+        if (
+            this.helper.hasBlackDomain(url, this.settings.newWorkBlackDomains)
+        ) {
             return { canDownload: false, reason: "该域名在黑名单中，无法下载" };
         }
 
@@ -219,7 +248,9 @@ export class Downloader {
         if (headResult.success && headResult.headers) {
             return this.checkResponseHeader(headResult.headers);
         } else {
-            console.warn(`HEAD 预检失败: ${url} ${headResult.reason}, 将继续尝试下载`);
+            console.warn(
+                `HEAD 预检失败: ${url} ${headResult.reason}, 将继续尝试下载`,
+            );
         }
 
         return { canDownload: true };
@@ -236,7 +267,10 @@ export class Downloader {
 
         // 使用下载代理（如果设置了的话）
         if (this.settings.downloadProxy) {
-            return await this.headPrecheckByProxy(url, this.settings.downloadProxy.trim());
+            return await this.headPrecheckByProxy(
+                url,
+                this.settings.downloadProxy.trim(),
+            );
         }
 
         // 其他情况直接下载
@@ -244,36 +278,54 @@ export class Downloader {
     }
 
     // 通过用户设置的下载代理进行 HEAD 预检
-    private async headPrecheckByProxy(url: string, proxy: string): Promise<HeadPreCheckResult> {
+    private async headPrecheckByProxy(
+        url: string,
+        proxy: string,
+    ): Promise<HeadPreCheckResult> {
         url = proxy.replace(/{url}/g, url);
         return await this.headPrecheckByDirectly(url);
     }
 
     // 通过直接请求进行 HEAD 预检
-    private async headPrecheckByDirectly(url: string): Promise<HeadPreCheckResult> {
+    private async headPrecheckByDirectly(
+        url: string,
+    ): Promise<HeadPreCheckResult> {
         try {
             const response = await requestUrl({ url: url, method: "HEAD" });
             if (response.status !== 200) {
-                return { success: false, reason: `请求失败，状态码: ${response.status}` };
+                return {
+                    success: false,
+                    reason: `请求失败，状态码: ${response.status}`,
+                };
             }
 
             return { success: true, headers: response.headers };
         } catch (error) {
-            return { success: false, reason: error instanceof Error ? error.message : String(error) };
+            return {
+                success: false,
+                reason: error instanceof Error ? error.message : String(error),
+            };
         }
     }
 
     // 通过 Referer 进行 HEAD 预检
-    private async headPrecheckByReferer(url: string, referer: string): Promise<HeadPreCheckResult> {
+    private async headPrecheckByReferer(
+        url: string,
+        referer: string,
+    ): Promise<HeadPreCheckResult> {
         if (!Platform.isDesktopApp) {
-            return { success: false, reason: "移动端不支持通过 Referer HEAD 请求" };
+            return {
+                success: false,
+                reason: "移动端不支持通过 Referer HEAD 请求",
+            };
         }
 
         const options = {
             method: "HEAD",
             headers: {
                 Accept: "*/*",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
                 Referer: referer,
             },
             // rejectUnauthorized: false, // 调试自签名证书时解除注释
@@ -284,13 +336,16 @@ export class Downloader {
                 nodeRequestClient(url)
                     .request(url, options, (res: NodeResponse) => {
                         if (res.statusCode !== 200) {
-                            resolve({ success: false, reason: `请求失败，状态码: ${res.statusCode}` });
+                            resolve({
+                                success: false,
+                                reason: `请求失败，状态码: ${res.statusCode}`,
+                            });
                             return;
                         }
 
                         resolve({
                             success: true,
-                            headers: res.headers
+                            headers: res.headers,
                         });
                     })
                     .on("error", (error: Error) => {
@@ -300,14 +355,17 @@ export class Downloader {
             } catch (error) {
                 resolve({
                     success: false,
-                    reason: error instanceof Error ? error.message : String(error)
+                    reason:
+                        error instanceof Error ? error.message : String(error),
                 });
             }
         });
     }
 
     // 检查响应头, 判断是否可以下载
-    private checkResponseHeader(headers: Record<string, string>): DownloadPreCheckResult {
+    private checkResponseHeader(
+        headers: Record<string, string>,
+    ): DownloadPreCheckResult {
         const contentType = headers?.["content-type"] || "";
 
         if (contentType.includes("text/html")) {
@@ -336,7 +394,10 @@ export class Downloader {
 
         // 使用下载代理（如果设置了的话）
         if (this.settings.downloadProxy) {
-            return await this.downloadByProxy(url, this.settings.downloadProxy.trim());
+            return await this.downloadByProxy(
+                url,
+                this.settings.downloadProxy.trim(),
+            );
         }
 
         // 其他情况直接下载
@@ -344,7 +405,10 @@ export class Downloader {
     }
 
     // 通过用户设置的下载代理下载
-    private async downloadByProxy(url: string, proxy: string): Promise<DownloadResponse> {
+    private async downloadByProxy(
+        url: string,
+        proxy: string,
+    ): Promise<DownloadResponse> {
         url = proxy.replace(/{url}/g, url);
         return await this.downloadDirectly(url);
     }
@@ -364,11 +428,17 @@ export class Downloader {
 
             return { success: true, data: response.arrayBuffer };
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) };
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            };
         }
     }
 
-    private async downloadByReferer(url: string, referer: string): Promise<DownloadResponse> {
+    private async downloadByReferer(
+        url: string,
+        referer: string,
+    ): Promise<DownloadResponse> {
         if (!Platform.isDesktopApp) {
             return { success: false, error: "移动端不支持通过 Referer 下载" };
         }
@@ -376,7 +446,8 @@ export class Downloader {
         const options = {
             headers: {
                 Accept: "*/*",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
                 Referer: referer,
             },
             // rejectUnauthorized: false, // 调试自签名证书时解除注释
@@ -388,14 +459,20 @@ export class Downloader {
                     .get(url, options, (res: NodeResponse) => {
                         if (res.statusCode !== 200) {
                             res.resume(); // 消费响应数据以释放内存
-                            resolve({ success: false, error: `请求失败，状态码: ${res.statusCode}` });
+                            resolve({
+                                success: false,
+                                error: `请求失败，状态码: ${res.statusCode}`,
+                            });
                             return;
                         }
 
                         const result = this.checkResponseHeader(res.headers);
                         if (!result.canDownload) {
                             res.resume();
-                            resolve({ success: false, error: `响应头不符合要求: ${result.reason}` });
+                            resolve({
+                                success: false,
+                                error: `响应头不符合要求: ${result.reason}`,
+                            });
                             return;
                         }
 
@@ -427,7 +504,7 @@ export class Downloader {
                             // 安全提取纯净的 ArrayBuffer
                             const arrayBuffer = finalArray.buffer.slice(
                                 finalArray.byteOffset,
-                                finalArray.byteOffset + finalArray.byteLength
+                                finalArray.byteOffset + finalArray.byteLength,
                             );
                             resolve({ success: true, data: arrayBuffer });
                         });
@@ -438,7 +515,8 @@ export class Downloader {
             } catch (error) {
                 resolve({
                     success: false,
-                    error: error instanceof Error ? error.message : String(error)
+                    error:
+                        error instanceof Error ? error.message : String(error),
                 });
             }
         });
@@ -450,7 +528,10 @@ export class Downloader {
         // 匹配用户自定义的 Referer 规则
         if (this.settings.refererRules.length > 0) {
             for (const rule of this.settings.refererRules) {
-                if (hostname.endsWith(rule.domain) || hostname.includes(rule.domain)) {
+                if (
+                    hostname.endsWith(rule.domain) ||
+                    hostname.includes(rule.domain)
+                ) {
                     return rule.referer;
                 }
             }
@@ -458,14 +539,21 @@ export class Downloader {
 
         // 根据 URL 匹配预设的防盗链规则
         for (const rule of REFERER_RULES) {
-            if (hostname.endsWith(rule.domain) || hostname.includes(rule.domain)) {
+            if (
+                hostname.endsWith(rule.domain) ||
+                hostname.includes(rule.domain)
+            ) {
                 return rule.referer;
             }
         }
 
         // 尝试从当前文件的 frontmatter 中获取 referer
         const frontmatter = this.helper.getFrontmatter();
-        const targetKey = ["referer", "referrer", "source", "origin"].find(key => typeof frontmatter[key] === "string" && /^https?:\/\//i.test(frontmatter[key]))
+        const targetKey = ["referer", "referrer", "source", "origin"].find(
+            (key) =>
+                typeof frontmatter[key] === "string" &&
+                /^https?:\/\//i.test(frontmatter[key]),
+        );
         if (targetKey) {
             return String(frontmatter[targetKey]);
         }
@@ -478,7 +566,6 @@ export class Downloader {
             modal.open();
         });
     }
-
 }
 
 // 输入 Referer 的 Modal
