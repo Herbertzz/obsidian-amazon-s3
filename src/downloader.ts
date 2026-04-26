@@ -17,6 +17,7 @@ interface DownloadResponse {
     success: boolean;
     error?: string;
     data?: ArrayBuffer;
+    finalUrl?: string;
 }
 
 interface DownloadPreCheckResult {
@@ -40,7 +41,7 @@ interface DownloadResult {
 
 interface NodeResponse {
     statusCode?: number;
-    headers: Record<string, string>;
+    headers: Record<string, string | string[] | undefined>;
     resume(): void;
     on(event: "data", listener: (chunk: Uint8Array) => void): NodeResponse;
     on(event: "end", listener: () => void): NodeResponse;
@@ -79,6 +80,9 @@ const REFERER_RULES = [
     { domain: "mmbiz.qpic.cn", referer: "https://mp.weixin.qq.com/" },
     { domain: "qpic.cn", referer: "https://mp.weixin.qq.com/" },
 ];
+
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 
 function nodeRequestClient(url: string) {
     const globalRequire = (
@@ -209,7 +213,7 @@ export class Downloader {
         }
 
         // 从 URL 中提取文件名，处理 URL 编码，并替换掉不合法的文件名字符
-        const urlObj = new URL(url);
+        const urlObj = new URL(response.finalUrl || url);
         const pathname = decodeURI(urlObj.pathname);
         const name = pathname
             .substring(pathname.lastIndexOf("/") + 1)
@@ -290,8 +294,40 @@ export class Downloader {
     private async headPrecheckByDirectly(
         url: string,
     ): Promise<HeadPreCheckResult> {
+        return this.headPrecheckByDirectlyWithRedirect(url, 0);
+    }
+
+    private async headPrecheckByDirectlyWithRedirect(
+        url: string,
+        redirectCount: number,
+    ): Promise<HeadPreCheckResult> {
         try {
             const response = await requestUrl({ url: url, method: "HEAD" });
+
+            if (this.isRedirectStatus(response.status)) {
+                const redirectUrl = this.resolveRedirectUrl(
+                    url,
+                    this.getHeader(response.headers, "location"),
+                );
+                if (!redirectUrl) {
+                    return {
+                        success: false,
+                        reason: `重定向缺少 location，状态码: ${response.status}`,
+                    };
+                }
+                if (redirectCount >= MAX_REDIRECTS) {
+                    return {
+                        success: false,
+                        reason: `重定向次数超过上限(${MAX_REDIRECTS})`,
+                    };
+                }
+
+                return await this.headPrecheckByDirectlyWithRedirect(
+                    redirectUrl,
+                    redirectCount + 1,
+                );
+            }
+
             if (response.status !== 200) {
                 return {
                     success: false,
@@ -335,6 +371,37 @@ export class Downloader {
             try {
                 nodeRequestClient(url)
                     .request(url, options, (res: NodeResponse) => {
+                        if (this.isRedirectStatus(res.statusCode)) {
+                            const redirectUrl = this.resolveRedirectUrl(
+                                url,
+                                this.getHeader(res.headers, "location"),
+                            );
+                            if (!redirectUrl) {
+                                resolve({
+                                    success: false,
+                                    reason: `重定向缺少 location，状态码: ${res.statusCode}`,
+                                });
+                                return;
+                            }
+
+                            void this.headPrecheckByRefererWithRedirect(
+                                redirectUrl,
+                                referer,
+                                1,
+                            )
+                                .then(resolve)
+                                .catch((error: unknown) => {
+                                    resolve({
+                                        success: false,
+                                        reason:
+                                            error instanceof Error
+                                                ? error.message
+                                                : String(error),
+                                    });
+                                });
+                            return;
+                        }
+
                         if (res.statusCode !== 200) {
                             resolve({
                                 success: false,
@@ -345,7 +412,91 @@ export class Downloader {
 
                         resolve({
                             success: true,
-                            headers: res.headers,
+                            headers: this.normalizeHeaders(res.headers),
+                        });
+                    })
+                    .on("error", (error: Error) => {
+                        resolve({ success: false, reason: error.message });
+                    })
+                    .end();
+            } catch (error) {
+                resolve({
+                    success: false,
+                    reason:
+                        error instanceof Error ? error.message : String(error),
+                });
+            }
+        });
+    }
+
+    private async headPrecheckByRefererWithRedirect(
+        url: string,
+        referer: string,
+        redirectCount: number,
+    ): Promise<HeadPreCheckResult> {
+        if (redirectCount > MAX_REDIRECTS) {
+            return {
+                success: false,
+                reason: `重定向次数超过上限(${MAX_REDIRECTS})`,
+            };
+        }
+
+        return new Promise((resolve) => {
+            try {
+                const options = {
+                    method: "HEAD",
+                    headers: {
+                        Accept: "*/*",
+                        "User-Agent":
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                        Referer: referer,
+                    },
+                };
+
+                nodeRequestClient(url)
+                    .request(url, options, (res: NodeResponse) => {
+                        if (this.isRedirectStatus(res.statusCode)) {
+                            const redirectUrl = this.resolveRedirectUrl(
+                                url,
+                                this.getHeader(res.headers, "location"),
+                            );
+                            if (!redirectUrl) {
+                                resolve({
+                                    success: false,
+                                    reason: `重定向缺少 location，状态码: ${res.statusCode}`,
+                                });
+                                return;
+                            }
+
+                            void this.headPrecheckByRefererWithRedirect(
+                                redirectUrl,
+                                referer,
+                                redirectCount + 1,
+                            )
+                                .then(resolve)
+                                .catch((error: unknown) => {
+                                    resolve({
+                                        success: false,
+                                        reason:
+                                            error instanceof Error
+                                                ? error.message
+                                                : String(error),
+                                    });
+                                });
+                            return;
+                        }
+
+                        if (res.statusCode !== 200) {
+                            resolve({
+                                success: false,
+                                reason: `请求失败，状态码: ${res.statusCode}`,
+                            });
+                            return;
+                        }
+
+                        resolve({
+                            success: true,
+                            headers: this.normalizeHeaders(res.headers),
                         });
                     })
                     .on("error", (error: Error) => {
@@ -364,9 +515,9 @@ export class Downloader {
 
     // 检查响应头, 判断是否可以下载
     private checkResponseHeader(
-        headers: Record<string, string>,
+        headers: Record<string, string | string[] | undefined>,
     ): DownloadPreCheckResult {
-        const contentType = headers?.["content-type"] || "";
+        const contentType = this.getHeader(headers, "content-type");
 
         if (contentType.includes("text/html")) {
             return { canDownload: false, reason: "URL 指向的是 HTML 页面" };
@@ -415,8 +566,36 @@ export class Downloader {
 
     // 直接下载
     private async downloadDirectly(url: string): Promise<DownloadResponse> {
+        return this.downloadDirectlyWithRedirect(url, 0);
+    }
+
+    private async downloadDirectlyWithRedirect(
+        url: string,
+        redirectCount: number,
+    ): Promise<DownloadResponse> {
         try {
             const response = await requestUrl({ url: url, method: "GET" });
+
+            if (this.isRedirectStatus(response.status)) {
+                const redirectUrl = this.resolveRedirectUrl(
+                    url,
+                    this.getHeader(response.headers, "location"),
+                );
+                if (!redirectUrl) {
+                    throw new Error(
+                        `重定向缺少 location，状态码: ${response.status}`,
+                    );
+                }
+                if (redirectCount >= MAX_REDIRECTS) {
+                    throw new Error(`重定向次数超过上限(${MAX_REDIRECTS})`);
+                }
+
+                return await this.downloadDirectlyWithRedirect(
+                    redirectUrl,
+                    redirectCount + 1,
+                );
+            }
+
             if (response.status !== 200) {
                 throw new Error(`下载失败，HTTP 状态码: ${response.status}`);
             }
@@ -426,7 +605,7 @@ export class Downloader {
                 throw new Error(`响应头不符合要求: ${result.reason}`);
             }
 
-            return { success: true, data: response.arrayBuffer };
+            return { success: true, data: response.arrayBuffer, finalUrl: url };
         } catch (error) {
             return {
                 success: false,
@@ -457,6 +636,38 @@ export class Downloader {
             try {
                 nodeRequestClient(url)
                     .get(url, options, (res: NodeResponse) => {
+                        if (this.isRedirectStatus(res.statusCode)) {
+                            const redirectUrl = this.resolveRedirectUrl(
+                                url,
+                                this.getHeader(res.headers, "location"),
+                            );
+                            res.resume();
+                            if (!redirectUrl) {
+                                resolve({
+                                    success: false,
+                                    error: `重定向缺少 location，状态码: ${res.statusCode}`,
+                                });
+                                return;
+                            }
+
+                            void this.downloadByRefererWithRedirect(
+                                redirectUrl,
+                                referer,
+                                1,
+                            )
+                                .then(resolve)
+                                .catch((error: unknown) => {
+                                    resolve({
+                                        success: false,
+                                        error:
+                                            error instanceof Error
+                                                ? error.message
+                                                : String(error),
+                                    });
+                                });
+                            return;
+                        }
+
                         if (res.statusCode !== 200) {
                             res.resume(); // 消费响应数据以释放内存
                             resolve({
@@ -506,7 +717,11 @@ export class Downloader {
                                 finalArray.byteOffset,
                                 finalArray.byteOffset + finalArray.byteLength,
                             );
-                            resolve({ success: true, data: arrayBuffer });
+                            resolve({
+                                success: true,
+                                data: arrayBuffer,
+                                finalUrl: url,
+                            });
                         });
                     })
                     .on("error", (error: Error) => {
@@ -520,6 +735,176 @@ export class Downloader {
                 });
             }
         });
+    }
+
+    private async downloadByRefererWithRedirect(
+        url: string,
+        referer: string,
+        redirectCount: number,
+    ): Promise<DownloadResponse> {
+        if (redirectCount > MAX_REDIRECTS) {
+            return { success: false, error: `重定向次数超过上限(${MAX_REDIRECTS})` };
+        }
+
+        return new Promise((resolve) => {
+            try {
+                const options = {
+                    headers: {
+                        Accept: "*/*",
+                        "User-Agent":
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+                        Referer: referer,
+                    },
+                };
+
+                nodeRequestClient(url)
+                    .get(url, options, (res: NodeResponse) => {
+                        if (this.isRedirectStatus(res.statusCode)) {
+                            const redirectUrl = this.resolveRedirectUrl(
+                                url,
+                                this.getHeader(res.headers, "location"),
+                            );
+                            res.resume();
+                            if (!redirectUrl) {
+                                resolve({
+                                    success: false,
+                                    error: `重定向缺少 location，状态码: ${res.statusCode}`,
+                                });
+                                return;
+                            }
+
+                            void this.downloadByRefererWithRedirect(
+                                redirectUrl,
+                                referer,
+                                redirectCount + 1,
+                            )
+                                .then(resolve)
+                                .catch((error: unknown) => {
+                                    resolve({
+                                        success: false,
+                                        error:
+                                            error instanceof Error
+                                                ? error.message
+                                                : String(error),
+                                    });
+                                });
+                            return;
+                        }
+
+                        if (res.statusCode !== 200) {
+                            res.resume();
+                            resolve({
+                                success: false,
+                                error: `请求失败，状态码: ${res.statusCode}`,
+                            });
+                            return;
+                        }
+
+                        const result = this.checkResponseHeader(res.headers);
+                        if (!result.canDownload) {
+                            res.resume();
+                            resolve({
+                                success: false,
+                                error: `响应头不符合要求: ${result.reason}`,
+                            });
+                            return;
+                        }
+
+                        const chunks: Uint8Array[] = [];
+                        res.on("data", (chunk: Uint8Array) => {
+                            chunks.push(chunk);
+                        });
+
+                        res.on("end", () => {
+                            let totalLength = 0;
+                            for (const chunk of chunks) {
+                                totalLength += chunk.length;
+                            }
+
+                            const finalArray = new Uint8Array(totalLength);
+                            let offset = 0;
+                            for (const chunk of chunks) {
+                                finalArray.set(chunk, offset);
+                                offset += chunk.length;
+                            }
+
+                            const arrayBuffer = finalArray.buffer.slice(
+                                finalArray.byteOffset,
+                                finalArray.byteOffset + finalArray.byteLength,
+                            );
+                            resolve({
+                                success: true,
+                                data: arrayBuffer,
+                                finalUrl: url,
+                            });
+                        });
+                    })
+                    .on("error", (error: Error) => {
+                        resolve({ success: false, error: error.message });
+                    });
+            } catch (error) {
+                resolve({
+                    success: false,
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                });
+            }
+        });
+    }
+
+    private isRedirectStatus(status?: number): boolean {
+        return typeof status === "number" && REDIRECT_STATUS_CODES.has(status);
+    }
+
+    private resolveRedirectUrl(
+        currentUrl: string,
+        location: string,
+    ): string | null {
+        if (!location) {
+            return null;
+        }
+
+        try {
+            return new URL(location, currentUrl).toString();
+        } catch {
+            return null;
+        }
+    }
+
+    private getHeader(
+        headers: Record<string, string | string[] | undefined>,
+        key: string,
+    ): string {
+        const target = key.toLowerCase();
+        for (const headerKey in headers) {
+            const value = headers[headerKey];
+            if (headerKey.toLowerCase() !== target) {
+                continue;
+            }
+
+            if (Array.isArray(value)) {
+                return value[0] || "";
+            }
+
+            return value || "";
+        }
+
+        return "";
+    }
+
+    private normalizeHeaders(
+        headers: Record<string, string | string[] | undefined>,
+    ): Record<string, string> {
+        const normalized: Record<string, string> = {};
+        for (const key in headers) {
+            const value = headers[key];
+            if (Array.isArray(value)) {
+                normalized[key.toLowerCase()] = value[0] || "";
+            } else if (typeof value === "string") {
+                normalized[key.toLowerCase()] = value;
+            }
+        }
+        return normalized;
     }
 
     private async getReferer(url: string): Promise<string> {
