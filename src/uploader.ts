@@ -154,11 +154,6 @@ export class Uploader {
             }
         }
 
-        if (fileList.length !== uploadUrlList.length) {
-            new Notice("警告：文件列表与上传成功的文件数量不一致");
-            return;
-        }
-
         const currentFile = this.app.workspace.getActiveFile();
         if (activeFile?.path !== currentFile?.path) {
             new Notice("当前文件已变更，上传失败");
