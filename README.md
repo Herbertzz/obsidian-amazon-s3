@@ -27,16 +27,16 @@
 ## 快速开始
 
 1. 打开插件设置，填写 S3 参数：
-   - `Access key ID`
-   - `Secret access key`
-   - `Region`
-   - `Bucket`
-   - `Endpoint`（使用兼容 S3 服务时通常必填）
+    - `Access key ID`
+    - `Secret access key`
+    - `Region`
+    - `Bucket`
+    - `Endpoint`（使用兼容 S3 服务时通常必填）
 2. 设置上传路径模板（默认：`{year}/{month}/{fullName}`）
 3. 设置输出 URL 模板（默认：`{endpoint}/{bucket}/{path}`）
 4. 在命令面板执行：
-   - `上传所有文件`
-   - `下载所有文件`
+    - `上传所有文件`
+    - `下载所有文件`
 
 ## 命令
 
@@ -144,6 +144,24 @@ npm run build
 npm run lint
 ```
 
+使用 npm 脚本一键构建并发布到指定目录：
+
+```bash
+npm run publish-dev -- --dest="/path/to/.obsidian/plugins/obsidian-amazon-s3"
+```
+
+也可只传 Vault 目录（脚本会自动发布到 `.obsidian/plugins/<manifest.id>`）：
+
+```bash
+npm run publish-dev -- --vault="/path/to/vault"
+```
+
+或使用环境变量：
+
+```bash
+OBSIDIAN_VAULT="/path/to/vault" npm run publish-dev
+```
+
 ## 版本发布
 
 1. 更新 `manifest.json` 中 `version`
@@ -162,6 +180,6 @@ npm run lint
 本项目在以下方向上参考了社区实现思路，并结合当前插件需求进行了整合与扩展：
 
 - 防盗链下载（Referer 能力）参考：
-   - https://github.com/lovelyjuice/hotlink-protection-image-downloader
+    - https://github.com/lovelyjuice/hotlink-protection-image-downloader
 - Obsidian 图片自动上传交互与工作流参考：
-   - https://github.com/renmu123/obsidian-image-auto-upload-plugin
+    - https://github.com/renmu123/obsidian-image-auto-upload-plugin

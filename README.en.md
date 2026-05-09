@@ -27,16 +27,16 @@ Upload local images, attachments, or remote resources from Obsidian to Amazon S3
 ## Quick start
 
 1. Open the plugin settings and fill in your S3 configuration:
-   - `Access key ID`
-   - `Secret access key`
-   - `Region`
-   - `Bucket`
-   - `Endpoint` (usually required for S3-compatible services)
+    - `Access key ID`
+    - `Secret access key`
+    - `Region`
+    - `Bucket`
+    - `Endpoint` (usually required for S3-compatible services)
 2. Set the upload path template. Default: `{year}/{month}/{fullName}`.
 3. Set the output URL template. Default: `{endpoint}/{bucket}/{path}`.
 4. Run commands from the command palette:
-   - `Upload all files`
-   - `Download all files`
+    - `Upload all files`
+    - `Download all files`
 
 ## Commands
 
@@ -144,6 +144,24 @@ Run lint checks:
 npm run lint
 ```
 
+Build and publish artifacts to a target directory with npm scripts:
+
+```bash
+npm run publish-dev -- --dest="/path/to/.obsidian/plugins/obsidian-amazon-s3"
+```
+
+You can also pass only the vault directory (the script resolves `.obsidian/plugins/<manifest.id>` automatically):
+
+```bash
+npm run publish-dev -- --vault="/path/to/vault"
+```
+
+Or use an environment variable:
+
+```bash
+OBSIDIAN_VAULT="/path/to/vault" npm run publish-dev
+```
+
 ## Release
 
 1. Update `version` in `manifest.json`.
@@ -162,6 +180,6 @@ npm run lint
 This project draws on ideas from existing community plugins and adapts them to the current plugin requirements:
 
 - Hotlink-protected downloads with Referer support:
-  - https://github.com/lovelyjuice/hotlink-protection-image-downloader
+    - https://github.com/lovelyjuice/hotlink-protection-image-downloader
 - Obsidian image auto-upload interactions and workflow:
-  - https://github.com/renmu123/obsidian-image-auto-upload-plugin
+    - https://github.com/renmu123/obsidian-image-auto-upload-plugin
