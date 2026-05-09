@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.8](https://github.com/Herbertzz/obsidian-amazon-s3/compare/1.0.7...1.0.8) (2026-05-09)
+
+
+### Bug Fixes
+
+* **downloader:** 修复重定向下载与预检错误 ([75b3b1b](https://github.com/Herbertzz/obsidian-amazon-s3/commit/75b3b1bddeb3bb2e6cb7c97e816acf2d774175d3))
+* **uploader:** 移除数量校验并重建依赖锁 ([42a01b8](https://github.com/Herbertzz/obsidian-amazon-s3/commit/42a01b8d6d4ab8e7c76954a4ccd6a19da48a7953))
+
 ### [1.0.7](https://github.com/Herbertzz/obsidian-amazon-s3/compare/1.0.6...1.0.7) (2026-03-23)
 
 
